@@ -1,623 +1,264 @@
-const SUPABASE_URL = "https://tkhykusvmsceleflynok.supabase.co";
-const SUPABASE_KEY = "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
+const SUPABASE_URL =
+  "https://tkhykusvmsceleflynok.supabase.co";
+
+const SUPABASE_KEY =
+  "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
+
 const PLAYER_CODE = "GARY";
 
-const state = {
-  data: null,
-  selectionTeamId: null,
-  deadline: null
-};
+const playerName =
+  document.getElementById("playerName");
 
-const $ = (id) => document.getElementById(id);
+const roundNumber =
+  document.getElementById("roundNumber");
 
-async function callRpc(name, body) {
-  const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/rpc/${name}`,
-    {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
-    }
-  );
+const heroStatus =
+  document.querySelector(".hero-status");
 
-  const text = await response.text();
+const selectionTitle =
+  document.getElementById("selectionTitle");
 
-  let data = null;
+const selectionHint =
+  document.getElementById("selectionHint");
+
+const fixtures =
+  document.getElementById("fixtures");
+
+const lockPill =
+  document.getElementById("lockPill");
+
+const countdown =
+  document.getElementById("countdown");
+
+const confirmButton =
+  document.getElementById("confirmBtn");
+
+
+/*
+  First prove that this version
+  of app.js has loaded.
+*/
+
+playerName.textContent =
+  "CONNECTING...";
+
+roundNumber.textContent =
+  "TEST";
+
+heroStatus.textContent =
+  "JavaScript is running";
+
+selectionTitle.textContent =
+  "Connecting to Supabase...";
+
+selectionHint.textContent =
+  "Testing the database connection.";
+
+fixtures.innerHTML =
+  '<div class="empty-state">Connecting...</div>';
+
+
+async function testConnection() {
 
   try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
-  }
 
-  if (!response.ok) {
-    throw new Error(
-      (data &&
-        (data.message ||
-          data.error ||
-          data.hint)) ||
-      `Supabase RPC error ${response.status}`
-    );
-  }
+    const response =
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/rpc/get_lms_player_data`,
+        {
+          method: "POST",
 
-  return data;
-}
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization:
+              `Bearer ${SUPABASE_KEY}`,
+            "Content-Type":
+              "application/json"
+          },
 
-function first(value) {
-  return Array.isArray(value)
-    ? value[0]
-    : value;
-}
-
-function money(value) {
-  const n = Number(value);
-
-  return Number.isFinite(n)
-    ? `£${n}`
-    : "£5";
-}
-
-function formatDate(value) {
-  if (!value) return "";
-
-  const d = new Date(value);
-
-  if (Number.isNaN(d.getTime())) {
-    return "";
-  }
-
-  return d.toLocaleString(
-    "en-GB",
-    {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
-}
-
-function normaliseDashboard(raw) {
-  const data = first(raw) || {};
-
-  return {
-    success:
-      data.success !== false,
-
-    player:
-      data.player || {},
-
-    competition:
-      data.competition || {},
-
-    current_round:
-      data.current_round ||
-      data.round ||
-      {},
-
-    selection:
-      data.selection || null,
-
-    used_teams:
-      data.used_teams || [],
-
-    fixtures:
-      data.fixtures || []
-  };
-}
-
-function getUsedTeams() {
-  const ids = new Set();
-  const names = new Set();
-
-  const used =
-    state.data?.used_teams || [];
-
-  used.forEach((team) => {
-    if (!team) return;
-
-    if (typeof team === "string") {
-      names.add(
-        team.trim().toLowerCase()
+          body:
+            JSON.stringify({
+              p_player_code:
+                PLAYER_CODE
+            })
+        }
       );
-      return;
-    }
 
-    const id =
-      team.team_id ||
-      team.id;
 
-    const name =
-      team.team_name ||
-      team.name ||
-      team.short_name;
+    const responseText =
+      await response.text();
 
-    if (id) {
-      ids.add(String(id));
-    }
 
-    if (name) {
-      names.add(
-        String(name)
-          .trim()
-          .toLowerCase()
+    if (!response.ok) {
+
+      throw new Error(
+        `HTTP ${response.status}: ${responseText}`
       );
+
     }
-  });
 
-  return {
-    ids,
-    names
-  };
-}
 
-function isTeamUsed(
-  teamId,
-  teamName,
-  used
-) {
-  if (
-    teamId &&
-    used.ids.has(String(teamId))
-  ) {
-    return true;
-  }
+    let data;
 
-  if (
-    teamName &&
-    used.names.has(
-      String(teamName)
-        .trim()
-        .toLowerCase()
-    )
-  ) {
-    return true;
-  }
+    try {
 
-  return false;
-}
-
-function getFixtureHomeId(fixture) {
-  return (
-    fixture.home_team_id ||
-    fixture.home_id ||
-    fixture.homeTeamId ||
-    null
-  );
-}
-
-function getFixtureAwayId(fixture) {
-  return (
-    fixture.away_team_id ||
-    fixture.away_id ||
-    fixture.awayTeamId ||
-    null
-  );
-}
-
-function getFixtureHomeName(fixture) {
-  return (
-    fixture.home_name ||
-    fixture.home_team ||
-    fixture.home ||
-    fixture.homeTeam ||
-    "Home"
-  );
-}
-
-function getFixtureAwayName(fixture) {
-  return (
-    fixture.away_name ||
-    fixture.away_team ||
-    fixture.away ||
-    fixture.awayTeam ||
-    "Away"
-  );
-}
-
-function renderDashboard() {
-  const d = state.data;
-
-  if (!d) return;
-
-  const player =
-    d.player || {};
-
-  const competition =
-    d.competition || {};
-
-  const round =
-    d.current_round || {};
-
-  $("playerName").textContent =
-    player.name ||
-    PLAYER_CODE;
-
-  $("roundNumber").textContent =
-    round.round_number
-      ? `Round ${round.round_number}`
-      : "Waiting";
-
-  const statusText =
-    round.status === "open"
-      ? "Choose your team"
-      : round.status === "locked"
-      ? "Selections locked"
-      : round.status === "in_progress"
-      ? "Round in progress"
-      : round.status === "completed"
-      ? "Round completed"
-      : "Waiting to start";
-
-  const heroStatus =
-    document.querySelector(
-      ".hero-status"
-    );
-
-  if (heroStatus) {
-    heroStatus.textContent =
-      statusText;
-  }
-
-  const badge =
-    document.querySelector(
-      ".badge"
-    );
-
-  if (badge) {
-    const s =
-      String(
-        player.status ||
-          "alive"
-      ).toUpperCase();
-
-    badge.textContent = s;
-
-    badge.className =
-      "badge " +
-      (s === "ALIVE"
-        ? "alive"
-        : "");
-  }
-
-  const stats =
-    document.querySelectorAll(
-      ".stat-grid strong"
-    );
-
-  if (stats.length >= 3) {
-    stats[0].textContent =
-      (
-        d.used_teams || []
-      ).length;
-
-    stats[1].textContent =
-      player.missed_selection_count ??
-      0;
-
-    stats[2].textContent =
-      money(
-        competition.entry_fee
-      );
-  }
-
-  state.deadline =
-    round.selection_deadline ||
-    null;
-
-  state.selectionTeamId =
-    d.selection?.team_id ||
-    null;
-
-  let selectedTeamName =
-    d.selection?.team_name ||
-    null;
-
-  if (
-    !selectedTeamName &&
-    state.selectionTeamId
-  ) {
-    const selectedFixture =
-      (
-        d.fixtures || []
-      ).find((fixture) => {
-        return (
-          String(
-            getFixtureHomeId(
-              fixture
-            )
-          ) ===
-            String(
-              state.selectionTeamId
-            ) ||
-          String(
-            getFixtureAwayId(
-              fixture
-            )
-          ) ===
-            String(
-              state.selectionTeamId
-            )
+      data =
+        JSON.parse(
+          responseText
         );
-      });
 
-    if (selectedFixture) {
-      if (
-        String(
-          getFixtureHomeId(
-            selectedFixture
-          )
-        ) ===
-        String(
-          state.selectionTeamId
-        )
-      ) {
-        selectedTeamName =
-          getFixtureHomeName(
-            selectedFixture
-          );
-      } else {
-        selectedTeamName =
-          getFixtureAwayName(
-            selectedFixture
-          );
-      }
+    } catch (error) {
+
+      throw new Error(
+        "Supabase returned something that was not valid JSON: " +
+        responseText
+      );
+
     }
-  }
 
-  $("selectionTitle").textContent =
-    selectedTeamName ||
-    "Choose your team";
 
-  $("lockPill").textContent =
-    round.status === "open"
-      ? "OPEN"
-      : String(
-          round.status ||
-            "WAITING"
-        ).toUpperCase();
+    console.log(
+      "SUPABASE RESPONSE:",
+      data
+    );
 
-  renderFixtures();
 
-  const hint =
-    $("selectionHint");
+    /*
+      Database connection worked.
+    */
 
-  if (hint) {
-    if (selectedTeamName) {
-      hint.textContent =
-        `Your current selection is ${selectedTeamName}. You can change it until the deadline.`;
+    playerName.textContent =
+      data?.player?.name ||
+      "GARY NOT FOUND";
+
+    roundNumber.textContent =
+      data?.current_round?.round_number
+        ? `Round ${data.current_round.round_number}`
+        : "NO ROUND";
+
+    heroStatus.textContent =
+      data?.current_round?.status ||
+      "NO ROUND STATUS";
+
+    selectionTitle.textContent =
+      "DATABASE CONNECTED";
+
+    selectionHint.textContent =
+      "Supabase responded successfully.";
+
+    lockPill.textContent =
+      "CONNECTED";
+
+
+    const fixtureData =
+      data?.fixtures || [];
+
+
+    if (!fixtureData.length) {
+
+      fixtures.innerHTML =
+        '<div class="empty-state">Database connected, but no fixtures were returned.</div>';
+
     } else {
-      hint.textContent =
-        "Choose one Premier League team to win its game.";
+
+      fixtures.innerHTML =
+        fixtureData
+          .map(
+            (fixture) => {
+
+              const home =
+                fixture.home_name ||
+                fixture.home_team ||
+                "Home";
+
+              const away =
+                fixture.away_name ||
+                fixture.away_team ||
+                "Away";
+
+              return `
+                <div class="fixture">
+
+                  <div class="fixture-main">
+
+                    <div class="fixture-teams">
+                      ${home} v ${away}
+                    </div>
+
+                    <div class="fixture-time">
+                      ${fixture.kickoff_time || ""}
+                    </div>
+
+                  </div>
+
+                </div>
+              `;
+
+            }
+          )
+          .join("");
+
     }
-  }
-}
 
-function renderFixtures() {
-  const el =
-    $("fixtures");
 
-  const fixtures =
-    state.data?.fixtures || [];
-
-  const used =
-    getUsedTeams();
-
-  const round =
-    state.data?.current_round ||
-    {};
-
-  const deadlinePassed =
-    state.deadline &&
-    new Date(
-      state.deadline
-    ).getTime() <=
-      Date.now();
-
-  const roundIsOpen =
-    round.status === "open" &&
-    !deadlinePassed;
-
-  if (!fixtures.length) {
-    el.innerHTML =
-      '<div class="empty-state">No fixtures are available for the current round yet.</div>';
-
-    $("confirmBtn").disabled =
+    confirmButton.disabled =
       true;
 
-    return;
+
+  } catch (error) {
+
+    console.error(
+      "LAST MAN STANDING ERROR:",
+      error
+    );
+
+
+    /*
+      Put the EXACT error
+      onto the phone screen.
+    */
+
+    playerName.textContent =
+      "ERROR";
+
+    roundNumber.textContent =
+      "CONNECTION FAILED";
+
+    heroStatus.textContent =
+      "JavaScript is running";
+
+    selectionTitle.textContent =
+      "Supabase error";
+
+    lockPill.textContent =
+      "ERROR";
+
+    fixtures.innerHTML =
+      `
+        <div
+          class="empty-state"
+          style="
+            color:#ff8b8b;
+            text-align:left;
+            word-break:break-word;
+          "
+        >
+          ${String(
+            error.message ||
+            error
+          )}
+        </div>
+      `;
+
+    selectionHint.textContent =
+      "Send me a screenshot of the red error above.";
+
+    confirmButton.disabled =
+      true;
+
   }
 
-  el.innerHTML =
-    fixtures
-      .map((fixture) => {
+}
 
-        const homeId =
-          getFixtureHomeId(
-            fixture
-          );
 
-        const awayId =
-          getFixtureAwayId(
-            fixture
-          );
-
-        const home =
-          getFixtureHomeName(
-            fixture
-          );
-
-        const away =
-          getFixtureAwayName(
-            fixture
-          );
-
-        const kickoff =
-          formatDate(
-            fixture.kickoff_time
-          );
-
-        const fixtureStatus =
-          fixture.status ||
-          "scheduled";
-
-        function teamButton(
-          id,
-          name
-        ) {
-          const usedAlready =
-            isTeamUsed(
-              id,
-              name,
-              used
-            ) &&
-            String(id) !==
-              String(
-                state.selectionTeamId
-              );
-
-          const selected =
-            String(
-              state.selectionTeamId
-            ) ===
-            String(id);
-
-          const unavailable =
-            fixtureStatus !==
-            "scheduled";
-
-          const disabled =
-            usedAlready ||
-            unavailable ||
-            !roundIsOpen;
-
-          let label =
-            "PICK";
-
-          if (selected) {
-            label =
-              "SELECTED";
-          } else if (
-            usedAlready
-          ) {
-            label =
-              "USED";
-          } else if (
-            unavailable
-          ) {
-            label =
-              String(
-                fixtureStatus
-              ).toUpperCase();
-          } else if (
-            !roundIsOpen
-          ) {
-            label =
-              "LOCKED";
-          }
-
-          const usedStyle =
-            usedAlready
-              ? `
-                style="
-                  background:#3a3f48;
-                  border-color:#555b65;
-                  color:#8f959e;
-                  opacity:1;
-                  cursor:not-allowed;
-                "
-              `
-              : "";
-
-          return `
-            <button
-              class="pick-btn ${
-                selected
-                  ? "selected"
-                  : usedAlready
-                  ? "used"
-                  : ""
-              }"
-              data-team-id="${
-                id || ""
-              }"
-              ${disabled
-                ? "disabled"
-                : ""}
-              ${usedStyle}
-            >
-              ${label} ${name}
-            </button>
-          `;
-        }
-
-        return `
-          <div class="fixture">
-
-            <div class="fixture-main">
-
-              <div class="fixture-teams">
-                ${home} v ${away}
-              </div>
-
-              <div class="fixture-time">
-                ${kickoff}
-              </div>
-
-            </div>
-
-            <div
-              style="
-                display:flex;
-                gap:8px;
-                flex-wrap:wrap;
-                margin-top:10px;
-              "
-            >
-
-              ${teamButton(
-                homeId,
-                home
-              )}
-
-              ${teamButton(
-                awayId,
-                away
-              )}
-
-            </div>
-
-          </div>
-        `;
-      })
-      .join("");
-
-  document
-    .querySelectorAll(
-      ".pick-btn[data-team-id]"
-    )
-    .forEach((button) => {
-
-      button.addEventListener(
-        "click",
-        () => {
-
-          if (
-            button.disabled
-          ) {
-            return;
-          }
-
-          state.selectionTeamId =
-            button.dataset.teamId;
-
-          const selectedFixture =
-            fixtures.find(
-              (fixture) => {
-
-                return
+testConnection();
