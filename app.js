@@ -9,7 +9,9 @@ const PLAYER_CODE = "GARY";
 const state = {
   data: null,
   selectionTeamId: null,
-  deadline: null
+  deadline: null,
+  history: [],
+  activeView: "home"
 };
 
 const $ = (id) =>
@@ -806,7 +808,8 @@ function renderFixtures() {
             const usedStyle =
               usedAlready
 
-                ? `
+                ?
+                `
                   style="
                     background:#3a3f48;
                     border-color:#555b65;
@@ -1306,6 +1309,516 @@ function updateCountdown() {
 }
 
 
+/* =====================================================
+   HISTORY
+   ===================================================== */
+
+function ensureHistoryView() {
+
+  let historyView =
+    document.getElementById(
+      "historyView"
+    );
+
+  if (historyView) {
+    return historyView;
+  }
+
+
+  historyView =
+    document.createElement(
+      "section"
+    );
+
+  historyView.id =
+    "historyView";
+
+  historyView.className =
+    "rules-card";
+
+  historyView.style.display =
+    "none";
+
+
+  historyView.innerHTML = `
+    <div class="section-title">
+
+      <div>
+
+        <span class="muted">
+          YOUR JOURNEY
+        </span>
+
+        <h2>
+          Selection History
+        </h2>
+
+      </div>
+
+    </div>
+
+    <div id="historyContent">
+
+      <div class="empty-state">
+        Loading your history...
+      </div>
+
+    </div>
+  `;
+
+
+  const main =
+    document.querySelector(
+      "main"
+    );
+
+
+  if (main) {
+    main.appendChild(
+      historyView
+    );
+  }
+
+
+  return historyView;
+
+}
+
+
+function resultLabel(result) {
+
+  const value =
+    String(
+      result ||
+      "pending"
+    ).toLowerCase();
+
+
+  if (value === "win") {
+    return "WIN";
+  }
+
+  if (value === "draw") {
+    return "DRAW";
+  }
+
+  if (value === "loss") {
+    return "LOSS";
+  }
+
+  if (value === "through") {
+    return "THROUGH";
+  }
+
+  if (value === "abandoned") {
+    return "ABANDONED";
+  }
+
+  if (value === "postponed") {
+    return "POSTPONED";
+  }
+
+  return "PENDING";
+
+}
+
+
+function resultStyle(result) {
+
+  const value =
+    String(
+      result ||
+      "pending"
+    ).toLowerCase();
+
+
+  if (
+    value === "win" ||
+    value === "through"
+  ) {
+
+    return "color:#86efac;";
+
+  }
+
+
+  if (
+    value === "loss"
+  ) {
+
+    return "color:#fca5a5;";
+
+  }
+
+
+  if (
+    value === "draw"
+  ) {
+
+    return "color:#fcd34d;";
+
+  }
+
+
+  return "color:#cbd5e1;";
+
+}
+
+
+function renderHistory() {
+
+  const view =
+    ensureHistoryView();
+
+
+  const content =
+    view.querySelector(
+      "#historyContent"
+    );
+
+
+  if (!content) {
+    return;
+  }
+
+
+  const history =
+    Array.isArray(
+      state.history
+    )
+      ? state.history
+      : [];
+
+
+  if (!history.length) {
+
+    content.innerHTML = `
+      <div class="empty-state">
+        No completed rounds yet.
+      </div>
+    `;
+
+    return;
+
+  }
+
+
+  content.innerHTML =
+    history
+      .map(
+        (item) => {
+
+          const roundNumber =
+            item.round_number ||
+            "?";
+
+          const teamName =
+            item.team_name ||
+            "Team";
+
+          const fixture =
+            item.fixture ||
+            "Fixture";
+
+          const result =
+            resultLabel(
+              item.result
+            );
+
+          const kickoff =
+            formatDate(
+              item.kickoff_time
+            );
+
+
+          let score = "";
+
+
+          if (
+            item.home_score !== null &&
+            item.home_score !== undefined &&
+            item.away_score !== null &&
+            item.away_score !== undefined
+          ) {
+
+            score = `
+              <div
+                style="
+                  font-size:20px;
+                  font-weight:800;
+                  margin-top:6px;
+                "
+              >
+                ${item.home_score}
+                -
+                ${item.away_score}
+              </div>
+            `;
+
+          }
+
+
+          return `
+            <div
+              style="
+                background:rgba(255,255,255,0.04);
+                border:1px solid rgba(255,255,255,0.08);
+                border-radius:16px;
+                padding:16px;
+                margin-bottom:12px;
+              "
+            >
+
+              <div
+                style="
+                  display:flex;
+                  justify-content:space-between;
+                  align-items:center;
+                  gap:12px;
+                "
+              >
+
+                <div>
+
+                  <div
+                    style="
+                      font-size:12px;
+                      text-transform:uppercase;
+                      letter-spacing:0.08em;
+                      opacity:0.65;
+                    "
+                  >
+                    ROUND ${roundNumber}
+                  </div>
+
+                  <div
+                    style="
+                      font-size:18px;
+                      font-weight:800;
+                      margin-top:4px;
+                    "
+                  >
+                    ${teamName}
+                  </div>
+
+                </div>
+
+
+                <div
+                  style="
+                    font-weight:800;
+                    font-size:13px;
+                    ${resultStyle(
+                      item.result
+                    )}
+                  "
+                >
+                  ${result}
+                </div>
+
+              </div>
+
+
+              <div
+                style="
+                  margin-top:12px;
+                  font-weight:600;
+                "
+              >
+                ${fixture}
+              </div>
+
+
+              ${score}
+
+
+              <div
+                style="
+                  margin-top:8px;
+                  font-size:13px;
+                  opacity:0.6;
+                "
+              >
+                ${kickoff}
+              </div>
+
+            </div>
+          `;
+
+        }
+      )
+      .join("");
+
+}
+
+
+async function loadHistory() {
+
+  const view =
+    ensureHistoryView();
+
+
+  const content =
+    view.querySelector(
+      "#historyContent"
+    );
+
+
+  if (content) {
+
+    content.innerHTML = `
+      <div class="empty-state">
+        Loading your history...
+      </div>
+    `;
+
+  }
+
+
+  try {
+
+    const raw =
+      await callRpc(
+        "get_lms_history",
+        {
+          p_player_code:
+            PLAYER_CODE
+        }
+      );
+
+
+    state.history =
+      Array.isArray(raw)
+        ? raw
+        : (
+            first(raw) ||
+            []
+          );
+
+
+    renderHistory();
+
+
+  } catch (error) {
+
+    console.error(
+      "Load history error:",
+      error
+    );
+
+
+    if (content) {
+
+      content.innerHTML = `
+        <div class="empty-state">
+
+          Could not load your history.
+
+          <br><br>
+
+          ${
+            error?.message ||
+            "Please try again."
+          }
+
+        </div>
+      `;
+
+    }
+
+  }
+
+}
+
+
+/* =====================================================
+   NAVIGATION
+   ===================================================== */
+
+function setMainView(view) {
+
+  const main =
+    document.querySelector(
+      "main"
+    );
+
+
+  if (!main) {
+    return;
+  }
+
+
+  const historyView =
+    ensureHistoryView();
+
+
+  const children =
+    Array.from(
+      main.children
+    );
+
+
+  children.forEach(
+    (child) => {
+
+      if (
+        child ===
+        historyView
+      ) {
+
+        return;
+
+      }
+
+
+      if (
+        view ===
+        "home"
+      ) {
+
+        child.style.display =
+          "";
+
+      } else if (
+        view ===
+        "rules" &&
+        child.classList.contains(
+          "rules-card"
+        )
+      ) {
+
+        child.style.display =
+          "";
+
+      } else {
+
+        child.style.display =
+          "none";
+
+      }
+
+    }
+  );
+
+
+  historyView.style.display =
+    view === "history"
+      ? ""
+      : "none";
+
+
+  state.activeView =
+    view;
+
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+
+}
+
+
 function setupNavigation() {
 
   const buttons =
@@ -1319,7 +1832,7 @@ function setupNavigation() {
 
       button.addEventListener(
         "click",
-        () => {
+        async () => {
 
           buttons.forEach(
             (b) =>
@@ -1338,43 +1851,27 @@ function setupNavigation() {
             index === 0
           ) {
 
-            window.scrollTo(
-              {
-                top: 0,
-                behavior:
-                  "smooth"
-              }
+            setMainView(
+              "home"
             );
 
           } else if (
             index === 1
           ) {
 
-            $("selectionHint")
-              .textContent =
-              "History will be available here as rounds are completed.";
+            setMainView(
+              "history"
+            );
+
+            await loadHistory();
 
           } else if (
             index === 2
           ) {
 
-            const rules =
-              document.querySelector(
-                ".rules-card"
-              );
-
-            if (rules) {
-
-              rules.scrollIntoView(
-                {
-                  behavior:
-                    "smooth",
-                  block:
-                    "start"
-                }
-              );
-
-            }
+            setMainView(
+              "rules"
+            );
 
           }
 
@@ -1386,6 +1883,10 @@ function setupNavigation() {
 
 }
 
+
+/* =====================================================
+   START APP
+   ===================================================== */
 
 function startApp() {
 
