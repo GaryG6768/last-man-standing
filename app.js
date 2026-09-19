@@ -1,9 +1,5 @@
-const SUPABASE_URL =
-  "https://tkhykusvmsceleflynok.supabase.co";
-
-const SUPABASE_KEY =
-  "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
-
+const SUPABASE_URL = "https://tkhykusvmsceleflynok.supabase.co";
+const SUPABASE_KEY = "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
 const PLAYER_CODE = "GARY";
 
 const state = {
@@ -11,309 +7,145 @@ const state = {
   selectionTeamId: null,
   deadline: null,
   history: [],
-  activeView: "home"
+  activeView: "home",
+  isLoading: false,
+  hasLoadedOnce: false,
+  pendingSelection: false,
+  lastLoadError: null
 };
 
-const $ = (id) =>
-  document.getElementById(id);
-
+const $ = (id) => document.getElementById(id);
 
 async function callRpc(name, body) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
 
-  const response =
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/${name}`,
-      {
-        method: "POST",
-
-        headers: {
-          apikey: SUPABASE_KEY,
-
-          Authorization:
-            `Bearer ${SUPABASE_KEY}`,
-
-          "Content-Type":
-            "application/json"
-        },
-
-        body:
-          JSON.stringify(body)
-      }
-    );
-
-
-  const text =
-    await response.text();
-
-
+  const text = await response.text();
   let data = null;
 
-
   try {
-
-    data =
-      text
-        ? JSON.parse(text)
-        : null;
-
+    data = text ? JSON.parse(text) : null;
   } catch {
-
     data = text;
-
   }
-
 
   if (!response.ok) {
-
     const message =
-      (
-        data &&
-        (
-          data.message ||
-          data.error ||
-          data.hint
-        )
-      ) ||
+      (data && (data.message || data.error || data.hint)) ||
       `Supabase RPC error ${response.status}`;
-
     throw new Error(message);
-
   }
-
 
   return data;
-
 }
-
 
 function first(value) {
-
-  return Array.isArray(value)
-    ? value[0]
-    : value;
-
+  return Array.isArray(value) ? value[0] : value;
 }
-
 
 function money(value) {
-
-  const n =
-    Number(value);
-
-  return Number.isFinite(n)
-    ? `£${n}`
-    : "£5";
-
+  const n = Number(value);
+  return Number.isFinite(n) ? `£${n}` : "£5";
 }
-
 
 function formatDate(value) {
+  if (!value) return "";
 
-  if (!value) {
-    return "";
-  }
+  const d = new Date(value);
 
-  const d =
-    new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
 
-  if (
-    Number.isNaN(
-      d.getTime()
-    )
-  ) {
-    return "";
-  }
-
-  return d.toLocaleString(
-    "en-GB",
-    {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
-
+  return d.toLocaleString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
-
 
 function normaliseDashboard(raw) {
-
-  const data =
-    first(raw) || {};
+  const data = first(raw) || {};
 
   return {
-
-    success:
-      data.success !== false,
-
-    player:
-      data.player || {},
-
-    competition:
-      data.competition || {},
-
-    current_round:
-      data.current_round ||
-      data.round ||
-      {},
-
-    selection:
-      data.selection ||
-      null,
-
-    used_teams:
-      data.used_teams ||
-      [],
-
-    fixtures:
-      data.fixtures ||
-      []
-
+    success: data.success !== false,
+    player: data.player || {},
+    competition: data.competition || {},
+    current_round: data.current_round || data.round || {},
+    selection: data.selection || null,
+    used_teams: data.used_teams || [],
+    fixtures: data.fixtures || []
   };
-
 }
-
 
 function getUsedTeams() {
+  const ids = new Set();
+  const names = new Set();
 
-  const ids =
-    new Set();
+  (state.data?.used_teams || []).forEach((team) => {
+    if (!team) return;
 
-  const names =
-    new Set();
-
-  (
-    state.data?.used_teams ||
-    []
-  ).forEach(
-    (team) => {
-
-      if (!team) {
-        return;
-      }
-
-      if (
-        typeof team ===
-        "string"
-      ) {
-
-        names.add(
-          team
-            .trim()
-            .toLowerCase()
-        );
-
-        return;
-
-      }
-
-      const id =
-        team.team_id ||
-        team.id;
-
-      const name =
-        team.team_name ||
-        team.name ||
-        team.short_name;
-
-      if (id) {
-
-        ids.add(
-          String(id)
-        );
-
-      }
-
-      if (name) {
-
-        names.add(
-          String(name)
-            .trim()
-            .toLowerCase()
-        );
-
-      }
-
+    if (typeof team === "string") {
+      names.add(team.trim().toLowerCase());
+      return;
     }
-  );
 
-  return {
-    ids,
-    names
-  };
+    const id = team.team_id || team.id;
+    const name = team.team_name || team.name || team.short_name;
 
+    if (id) {
+      ids.add(String(id));
+    }
+
+    if (name) {
+      names.add(String(name).trim().toLowerCase());
+    }
+  });
+
+  return { ids, names };
 }
 
-
-function isTeamUsed(
-  teamId,
-  teamName,
-  used
-) {
-
-  if (
-    teamId &&
-    used.ids.has(
-      String(teamId)
-    )
-  ) {
-
+function isTeamUsed(teamId, teamName, used) {
+  if (teamId && used.ids.has(String(teamId))) {
     return true;
-
   }
 
   if (
     teamName &&
-    used.names.has(
-      String(teamName)
-        .trim()
-        .toLowerCase()
-    )
+    used.names.has(String(teamName).trim().toLowerCase())
   ) {
-
     return true;
-
   }
 
   return false;
-
 }
 
-
-function getFixtureHomeId(
-  fixture
-) {
-
+function getFixtureHomeId(fixture) {
   return (
     fixture.home_team_id ||
     fixture.home_id ||
     fixture.homeTeamId ||
     null
   );
-
 }
 
-
-function getFixtureAwayId(
-  fixture
-) {
-
+function getFixtureAwayId(fixture) {
   return (
     fixture.away_team_id ||
     fixture.away_id ||
     fixture.awayTeamId ||
     null
   );
-
 }
 
-
-function getFixtureHomeName(
-  fixture
-) {
-
+function getFixtureHomeName(fixture) {
   return (
     fixture.home_name ||
     fixture.home_team ||
@@ -321,14 +153,9 @@ function getFixtureHomeName(
     fixture.homeTeam ||
     "Home"
   );
-
 }
 
-
-function getFixtureAwayName(
-  fixture
-) {
-
+function getFixtureAwayName(fixture) {
   return (
     fixture.away_name ||
     fixture.away_team ||
@@ -336,91 +163,56 @@ function getFixtureAwayName(
     fixture.awayTeam ||
     "Away"
   );
-
 }
 
-
-function getTeamNameFromFixture(
-  fixture,
-  teamId
-) {
-
+function getTeamNameFromFixture(fixture, teamId) {
   if (!fixture) {
     return "Team selected";
   }
 
   if (
-    String(
-      getFixtureHomeId(
-        fixture
-      )
-    ) ===
+    String(getFixtureHomeId(fixture)) ===
     String(teamId)
   ) {
-
-    return getFixtureHomeName(
-      fixture
-    );
-
+    return getFixtureHomeName(fixture);
   }
 
   if (
-    String(
-      getFixtureAwayId(
-        fixture
-      )
-    ) ===
+    String(getFixtureAwayId(fixture)) ===
     String(teamId)
   ) {
-
-    return getFixtureAwayName(
-      fixture
-    );
-
+    return getFixtureAwayName(fixture);
   }
 
   return "Team selected";
-
 }
 
-
 function deadlinePassed() {
-
   if (!state.deadline) {
     return false;
   }
 
   const time =
-    new Date(
-      state.deadline
-    ).getTime();
+    new Date(state.deadline).getTime();
 
   return (
     Number.isFinite(time) &&
     time <= Date.now()
   );
-
 }
 
-
 function roundIsOpen() {
-
   const round =
-    state.data?.current_round ||
-    {};
+    state.data?.current_round || {};
 
   return (
     round.status === "open" &&
     !deadlinePassed()
   );
-
 }
 
-
 function renderDashboard() {
-
-  const d =
-    state.data;
+  const d = state.data;
 
   if (!d) {
     return;
@@ -435,89 +227,55 @@ function renderDashboard() {
   const round =
     d.current_round || {};
 
+  $("playerName").textContent =
+    player.name || PLAYER_CODE;
 
-  $("playerName")
-    .textContent =
-    player.name ||
-    PLAYER_CODE;
-
-
-  $("roundNumber")
-    .textContent =
+  $("roundNumber").textContent =
     round.round_number
       ? `Round ${round.round_number}`
       : "Waiting";
 
-
   let statusText =
     "Waiting to start";
 
-
   if (
-    round.status ===
-    "open"
+    round.status === "open"
   ) {
-
     statusText =
       "Choose your team";
-
   } else if (
-    round.status ===
-    "locked"
+    round.status === "locked"
   ) {
-
     statusText =
       "Selections locked";
-
   } else if (
-    round.status ===
-    "in_progress"
+    round.status === "in_progress"
   ) {
-
     statusText =
       "Round in progress";
-
   } else if (
-    round.status ===
-    "completed"
+    round.status === "completed"
   ) {
-
     statusText =
       "Round completed";
-
-  } else if (
-    round.status ===
-    "upcoming"
-  ) {
-
-    statusText =
-      "Waiting to start";
-
   }
-
 
   const heroStatus =
     document.querySelector(
       ".hero-status"
     );
 
-
   if (heroStatus) {
-
     heroStatus.textContent =
       statusText;
-
   }
-
 
   const badge =
     document.querySelector(
       ".badge"
     );
 
-
   if (badge) {
-
     const status =
       String(
         player.status ||
@@ -530,25 +288,20 @@ function renderDashboard() {
     badge.className =
       "badge " +
       (
-        status ===
-        "ALIVE"
+        status === "ALIVE"
           ? "alive"
           : ""
       );
-
   }
-
 
   const stats =
     document.querySelectorAll(
       ".stat-grid strong"
     );
 
-
   if (
     stats.length >= 3
   ) {
-
     stats[0].textContent =
       (
         d.used_teams ||
@@ -563,38 +316,77 @@ function renderDashboard() {
       money(
         competition.entry_fee
       );
-
   }
-
 
   state.deadline =
     round.selection_deadline ||
     null;
 
-
-  state.selectionTeamId =
-    d.selection?.team_id ||
-    null;
-
+  /*
+    Important:
+    If the player has picked a new team but hasn't
+    confirmed it yet, don't let the background refresh
+    overwrite that choice.
+  */
+  if (!state.pendingSelection) {
+    state.selectionTeamId =
+      d.selection?.team_id ||
+      null;
+  }
 
   let selectedTeamName =
-    d.selection?.team_name ||
     null;
 
-
   if (
-    !selectedTeamName &&
+    state.pendingSelection &&
     state.selectionTeamId
   ) {
-
-    const selectedFixture =
+    const pendingFixture =
       (
         d.fixtures ||
         []
       ).find(
-        (fixture) => {
+        (fixture) =>
+          String(
+            getFixtureHomeId(
+              fixture
+            )
+          ) ===
+          String(
+            state.selectionTeamId
+          ) ||
+          String(
+            getFixtureAwayId(
+              fixture
+            )
+          ) ===
+          String(
+            state.selectionTeamId
+          )
+      );
 
-          return (
+    selectedTeamName =
+      getTeamNameFromFixture(
+        pendingFixture,
+        state.selectionTeamId
+      );
+
+  } else {
+
+    selectedTeamName =
+      d.selection?.team_name ||
+      null;
+
+    if (
+      !selectedTeamName &&
+      state.selectionTeamId
+    ) {
+      const selectedFixture =
+        (
+          d.fixtures ||
+          []
+        ).find(
+          (fixture) =>
             String(
               getFixtureHomeId(
                 fixture
@@ -603,7 +395,6 @@ function renderDashboard() {
             String(
               state.selectionTeamId
             ) ||
-
             String(
               getFixtureAwayId(
                 fixture
@@ -612,26 +403,20 @@ function renderDashboard() {
             String(
               state.selectionTeamId
             )
-          );
+        );
 
-        }
-      );
-
-
-    selectedTeamName =
-      getTeamNameFromFixture(
-        selectedFixture,
-        state.selectionTeamId
-      );
-
+      selectedTeamName =
+        getTeamNameFromFixture(
+          selectedFixture,
+          state.selectionTeamId
+        );
+    }
   }
-
 
   $("selectionTitle")
     .textContent =
     selectedTeamName ||
     "Choose your team";
-
 
   $("lockPill")
     .textContent =
@@ -642,39 +427,27 @@ function renderDashboard() {
           "WAITING"
         ).toUpperCase();
 
-
   renderFixtures();
-
 
   const hint =
     $("selectionHint");
 
-
   if (hint) {
-
     hint.textContent =
       selectedTeamName
-
         ? `Your current selection is ${selectedTeamName}. You can change it until the deadline.`
-
         : "Choose one Premier League team to win its game.";
-
   }
 
-
   updateCountdown();
-
 }
 
-
 function renderFixtures() {
-
   const el =
     $("fixtures");
 
   const fixtures =
-    state.data?.fixtures ||
-    [];
+    state.data?.fixtures || [];
 
   const used =
     getUsedTeams();
@@ -682,11 +455,9 @@ function renderFixtures() {
   const open =
     roundIsOpen();
 
-
   if (
     !fixtures.length
   ) {
-
     el.innerHTML =
       `
         <div class="empty-state">
@@ -698,9 +469,7 @@ function renderFixtures() {
       .disabled = true;
 
     return;
-
   }
-
 
   el.innerHTML =
     fixtures
@@ -736,7 +505,6 @@ function renderFixtures() {
             fixture.status ||
             "scheduled";
 
-
           function teamButton(
             id,
             name
@@ -749,7 +517,6 @@ function renderFixtures() {
               ) ===
               String(id);
 
-
             const usedAlready =
               !selected &&
               isTeamUsed(
@@ -758,56 +525,42 @@ function renderFixtures() {
                 used
               );
 
-
             const unavailable =
               fixtureStatus !==
               "scheduled";
-
 
             const disabled =
               usedAlready ||
               unavailable ||
               !open;
 
-
             let label =
               "PICK";
 
-
             if (selected) {
-
               label =
                 "SELECTED";
-
             } else if (
               usedAlready
             ) {
-
               label =
                 "USED";
-
             } else if (
               unavailable
             ) {
-
               label =
                 String(
                   fixtureStatus
                 ).toUpperCase();
-
             } else if (
               !open
             ) {
-
               label =
                 "LOCKED";
-
             }
-
 
             const usedStyle =
               usedAlready
-
                 ?
                 `
                   style="
@@ -818,9 +571,8 @@ function renderFixtures() {
                     cursor:not-allowed;
                   "
                 `
-
-                : "";
-
+                :
+                "";
 
             return `
               <button
@@ -844,9 +596,7 @@ function renderFixtures() {
                 ${label} ${name}
               </button>
             `;
-
           }
-
 
           return `
             <div class="fixture">
@@ -895,11 +645,9 @@ function renderFixtures() {
 
             </div>
           `;
-
         }
       )
       .join("");
-
 
   document
     .querySelectorAll(
@@ -918,38 +666,32 @@ function renderFixtures() {
               return;
             }
 
-
             state.selectionTeamId =
               button.dataset.teamId;
 
+            state.pendingSelection =
+              true;
 
             const selectedFixture =
               fixtures.find(
-                (fixture) => {
-
-                  return (
-                    String(
-                      getFixtureHomeId(
-                        fixture
-                      )
-                    ) ===
-                    String(
-                      state.selectionTeamId
-                    ) ||
-
-                    String(
-                      getFixtureAwayId(
-                        fixture
-                      )
-                    ) ===
-                    String(
-                      state.selectionTeamId
+                (fixture) =>
+                  String(
+                    getFixtureHomeId(
+                      fixture
                     )
-                  );
-
-                }
+                  ) ===
+                  String(
+                    state.selectionTeamId
+                  ) ||
+                  String(
+                    getFixtureAwayId(
+                      fixture
+                    )
+                  ) ===
+                  String(
+                    state.selectionTeamId
+                  )
               );
-
 
             const teamName =
               getTeamNameFromFixture(
@@ -957,57 +699,43 @@ function renderFixtures() {
                 state.selectionTeamId
               );
 
-
             $("selectionTitle")
               .textContent =
               teamName;
-
 
             $("selectionHint")
               .textContent =
               `Your current selection is ${teamName}. You can change it until the deadline.`;
 
-
             $("confirmBtn")
               .disabled = false;
-
 
             $("confirmBtn")
               .textContent =
               "Confirm selection";
 
-
             renderFixtures();
-
           }
         );
-
       }
     );
-
 
   $("confirmBtn")
     .disabled =
     !state.selectionTeamId ||
     !open;
-
 }
-
 
 async function saveSelection() {
 
   if (
     !state.selectionTeamId
   ) {
-
     return;
-
   }
-
 
   const round =
     state.data?.current_round;
-
 
   if (!round?.id) {
 
@@ -1016,21 +744,16 @@ async function saveSelection() {
       "There is no open round.";
 
     return;
-
   }
-
 
   const button =
     $("confirmBtn");
 
-
   button.disabled =
     true;
 
-
   button.textContent =
     "Saving...";
-
 
   try {
 
@@ -1049,7 +772,6 @@ async function saveSelection() {
         }
       );
 
-
     if (
       result?.success ===
       false
@@ -1059,22 +781,25 @@ async function saveSelection() {
         result.message ||
         "Selection was not saved."
       );
-
     }
 
+    /*
+      The selection has now been saved to Supabase.
+      Clear the pending flag so future refreshes use
+      the saved selection.
+    */
+    state.pendingSelection =
+      false;
 
     button.textContent =
       "Selection saved";
 
-
     button.disabled =
       true;
-
 
     $("selectionHint")
       .textContent =
       "Selection saved successfully. You can change it until the deadline.";
-
 
   } catch (error) {
 
@@ -1083,44 +808,108 @@ async function saveSelection() {
       error
     );
 
-
     button.disabled =
       false;
 
-
     button.textContent =
       "Confirm selection";
-
 
     $("selectionHint")
       .textContent =
       error?.message ||
       "Selection could not be saved.";
-
   }
-
 }
 
+/*
+  LOAD PLAYER
 
-async function loadPlayer() {
+  This version is designed to prevent the problem where
+  the app suddenly changes to "Failed to fetch".
+
+  It tries the connection up to 3 times.
+
+  If the app has already loaded successfully, a temporary
+  connection failure will NOT replace the working screen.
+*/
+async function loadPlayer(
+  silent = false
+) {
+
+  if (
+    state.isLoading
+  ) {
+    return;
+  }
+
+  state.isLoading =
+    true;
 
   try {
 
-    const raw =
-      await callRpc(
-        "get_lms_player_data",
-        {
-          p_player_code:
-            PLAYER_CODE
-        }
-      );
+    let raw =
+      null;
 
+    let lastError =
+      null;
+
+    /*
+      Retry temporary mobile/Supabase
+      connection drops.
+    */
+    for (
+      let attempt = 0;
+      attempt < 3;
+      attempt++
+    ) {
+
+      try {
+
+        raw =
+          await callRpc(
+            "get_lms_player_data",
+            {
+              p_player_code:
+                PLAYER_CODE
+            }
+          );
+
+        lastError =
+          null;
+
+        break;
+
+      } catch (error) {
+
+        lastError =
+          error;
+
+        if (
+          attempt < 2
+        ) {
+
+          await new Promise(
+            (resolve) =>
+              setTimeout(
+                resolve,
+                700 *
+                (attempt + 1)
+              )
+          );
+        }
+      }
+    }
+
+    if (
+      lastError
+    ) {
+      throw lastError;
+    }
 
     const data =
       normaliseDashboard(
         raw
       );
-
 
     if (
       !data.success
@@ -1129,16 +918,21 @@ async function loadPlayer() {
       throw new Error(
         "Player data could not be loaded."
       );
-
     }
 
-
+    /*
+      Successful connection.
+    */
     state.data =
       data;
 
+    state.hasLoadedOnce =
+      true;
+
+    state.lastLoadError =
+      null;
 
     renderDashboard();
-
 
   } catch (error) {
 
@@ -1147,35 +941,52 @@ async function loadPlayer() {
       error
     );
 
+    state.lastLoadError =
+      error;
 
+    /*
+      IMPORTANT:
+
+      If the app has already loaded once,
+      DO NOT replace the working screen.
+
+      The automatic 30-second refresh will
+      try again.
+    */
+    if (
+      state.hasLoadedOnce &&
+      state.data
+    ) {
+
+      return;
+    }
+
+    /*
+      Only show the full connection error
+      if the very first load failed.
+    */
     $("playerName")
       .textContent =
       "Connection error";
 
-
     $("roundNumber")
       .textContent =
       "Unable to load";
-
 
     const heroStatus =
       document.querySelector(
         ".hero-status"
       );
 
-
     if (heroStatus) {
 
       heroStatus.textContent =
         "Please refresh the app";
-
     }
-
 
     $("selectionTitle")
       .textContent =
       "Unable to load competition";
-
 
     $("fixtures")
       .innerHTML =
@@ -1188,26 +999,25 @@ async function loadPlayer() {
         </div>
       `;
 
-
     $("confirmBtn")
       .disabled =
       true;
 
+  } finally {
+
+    state.isLoading =
+      false;
   }
-
 }
-
 
 function updateCountdown() {
 
   const el =
     $("countdown");
 
-
   if (!el) {
     return;
   }
-
 
   if (!state.deadline) {
 
@@ -1215,15 +1025,12 @@ function updateCountdown() {
       "--:--:--";
 
     return;
-
   }
-
 
   const end =
     new Date(
       state.deadline
     ).getTime();
-
 
   if (
     !Number.isFinite(end)
@@ -1233,16 +1040,13 @@ function updateCountdown() {
       "--:--:--";
 
     return;
-
   }
-
 
   const remaining =
     Math.max(
       0,
       end - Date.now()
     );
-
 
   if (
     remaining === 0
@@ -1252,22 +1056,18 @@ function updateCountdown() {
       "00:00:00";
 
     return;
-
   }
-
 
   const totalSeconds =
     Math.floor(
       remaining / 1000
     );
 
-
   const days =
     Math.floor(
       totalSeconds /
       86400
     );
-
 
   const hours =
     Math.floor(
@@ -1277,7 +1077,6 @@ function updateCountdown() {
       ) / 3600
     );
 
-
   const minutes =
     Math.floor(
       (
@@ -1286,11 +1085,9 @@ function updateCountdown() {
       ) / 60
     );
 
-
   const seconds =
     totalSeconds %
     60;
-
 
   if (
     days > 0
@@ -1308,9 +1105,7 @@ function updateCountdown() {
       `${String(hours).padStart(2, "0")}:` +
       `${String(minutes).padStart(2, "0")}:` +
       `${String(seconds).padStart(2, "0")}`;
-
   }
-
 }
 
 
@@ -1325,10 +1120,11 @@ function ensureHistoryView() {
       "historyView"
     );
 
-  if (historyView) {
+  if (
+    historyView
+  ) {
     return historyView;
   }
-
 
   historyView =
     document.createElement(
@@ -1344,51 +1140,48 @@ function ensureHistoryView() {
   historyView.style.display =
     "none";
 
+  historyView.innerHTML =
+    `
+      <div class="section-title">
 
-  historyView.innerHTML = `
-    <div class="section-title">
+        <div>
 
-      <div>
+          <span class="muted">
+            YOUR JOURNEY
+          </span>
 
-        <span class="muted">
-          YOUR JOURNEY
-        </span>
+          <h2>
+            Selection History
+          </h2>
 
-        <h2>
-          Selection History
-        </h2>
+        </div>
 
       </div>
 
-    </div>
+      <div id="historyContent">
 
-    <div id="historyContent">
+        <div class="empty-state">
+          Loading your history...
+        </div>
 
-      <div class="empty-state">
-        Loading your history...
       </div>
-
-    </div>
-  `;
-
+    `;
 
   const main =
     document.querySelector(
       "main"
     );
 
-
-  if (main) {
+  if (
+    main
+  ) {
     main.appendChild(
       historyView
     );
   }
 
-
   return historyView;
-
 }
-
 
 function resultLabel(result) {
 
@@ -1398,35 +1191,44 @@ function resultLabel(result) {
       "pending"
     ).toLowerCase();
 
-
-  if (value === "win") {
+  if (
+    value === "win"
+  ) {
     return "WIN";
   }
 
-  if (value === "draw") {
+  if (
+    value === "draw"
+  ) {
     return "DRAW";
   }
 
-  if (value === "loss") {
+  if (
+    value === "loss"
+  ) {
     return "LOSS";
   }
 
-  if (value === "through") {
+  if (
+    value === "through"
+  ) {
     return "THROUGH";
   }
 
-  if (value === "abandoned") {
+  if (
+    value === "abandoned"
+  ) {
     return "ABANDONED";
   }
 
-  if (value === "postponed") {
+  if (
+    value === "postponed"
+  ) {
     return "POSTPONED";
   }
 
   return "PENDING";
-
 }
-
 
 function resultStyle(result) {
 
@@ -1436,56 +1238,41 @@ function resultStyle(result) {
       "pending"
     ).toLowerCase();
 
-
   if (
     value === "win" ||
     value === "through"
   ) {
-
     return "color:#86efac;";
-
   }
-
 
   if (
     value === "loss"
   ) {
-
     return "color:#fca5a5;";
-
   }
-
 
   if (
     value === "draw"
   ) {
-
     return "color:#fcd34a;";
-
   }
 
-
   return "color:#cbd5e1;";
-
 }
-
 
 function renderHistory() {
 
   const view =
     ensureHistoryView();
 
-
   const content =
     view.querySelector(
       "#historyContent"
     );
 
-
   if (!content) {
     return;
   }
-
 
   const history =
     Array.isArray(
@@ -1494,19 +1281,19 @@ function renderHistory() {
       ? state.history
       : [];
 
+  if (
+    !history.length
+  ) {
 
-  if (!history.length) {
-
-    content.innerHTML = `
-      <div class="empty-state">
-        No completed rounds yet.
-      </div>
-    `;
+    content.innerHTML =
+      `
+        <div class="empty-state">
+          No completed rounds yet.
+        </div>
+      `;
 
     return;
-
   }
-
 
   content.innerHTML =
     history
@@ -1535,33 +1322,35 @@ function renderHistory() {
               item.kickoff_time
             );
 
-
-          let score = "";
-
+          let score =
+            "";
 
           if (
-            item.home_score !== null &&
-            item.home_score !== undefined &&
-            item.away_score !== null &&
-            item.away_score !== undefined
+            item.home_score !==
+              null &&
+            item.home_score !==
+              undefined &&
+            item.away_score !==
+              null &&
+            item.away_score !==
+              undefined
           ) {
 
-            score = `
-              <div
-                style="
-                  font-size:20px;
-                  font-weight:800;
-                  margin-top:6px;
-                "
-              >
-                ${item.home_score}
-                -
-                ${item.away_score}
-              </div>
-            `;
-
+            score =
+              `
+                <div
+                  style="
+                    font-size:20px;
+                    font-weight:800;
+                    margin-top:6px;
+                  "
+                >
+                  ${item.home_score}
+                  -
+                  ${item.away_score}
+                </div>
+              `;
           }
-
 
           return `
             <div
@@ -1608,7 +1397,6 @@ function renderHistory() {
 
                 </div>
 
-
                 <div
                   style="
                     font-weight:800;
@@ -1623,7 +1411,6 @@ function renderHistory() {
 
               </div>
 
-
               <div
                 style="
                   margin-top:12px;
@@ -1633,9 +1420,7 @@ function renderHistory() {
                 ${fixture}
               </div>
 
-
               ${score}
-
 
               <div
                 style="
@@ -1649,36 +1434,30 @@ function renderHistory() {
 
             </div>
           `;
-
         }
       )
       .join("");
-
 }
-
 
 async function loadHistory() {
 
   const view =
     ensureHistoryView();
 
-
   const content =
     view.querySelector(
       "#historyContent"
     );
 
-
   if (content) {
 
-    content.innerHTML = `
-      <div class="empty-state">
-        Loading your history...
-      </div>
-    `;
-
+    content.innerHTML =
+      `
+        <div class="empty-state">
+          Loading your history...
+        </div>
+      `;
   }
-
 
   try {
 
@@ -1691,7 +1470,6 @@ async function loadHistory() {
         }
       );
 
-
     state.history =
       Array.isArray(raw)
         ? raw
@@ -1700,9 +1478,7 @@ async function loadHistory() {
             []
           );
 
-
     renderHistory();
-
 
   } catch (error) {
 
@@ -1711,28 +1487,25 @@ async function loadHistory() {
       error
     );
 
-
     if (content) {
 
-      content.innerHTML = `
-        <div class="empty-state">
+      content.innerHTML =
+        `
+          <div class="empty-state">
 
-          Could not load your history.
+            Could not load your history.
 
-          <br><br>
+            <br><br>
 
-          ${
-            error?.message ||
-            "Please try again."
-          }
+            ${
+              error?.message ||
+              "Please try again."
+            }
 
-        </div>
-      `;
-
+          </div>
+        `;
     }
-
   }
-
 }
 
 
@@ -1747,21 +1520,17 @@ function setMainView(view) {
       "main"
     );
 
-
   if (!main) {
     return;
   }
 
-
   const historyView =
     ensureHistoryView();
-
 
   const children =
     Array.from(
       main.children
     );
-
 
   children.forEach(
     (child) => {
@@ -1770,11 +1539,8 @@ function setMainView(view) {
         child ===
         historyView
       ) {
-
         return;
-
       }
-
 
       if (
         view ===
@@ -1799,30 +1565,23 @@ function setMainView(view) {
 
         child.style.display =
           "none";
-
       }
-
     }
   );
-
 
   historyView.style.display =
     view === "history"
       ? ""
       : "none";
 
-
   state.activeView =
     view;
-
 
   window.scrollTo({
     top: 0,
     behavior: "smooth"
   });
-
 }
-
 
 function setupNavigation() {
 
@@ -1830,7 +1589,6 @@ function setupNavigation() {
     document.querySelectorAll(
       ".nav-item"
     );
-
 
   buttons.forEach(
     (button, index) => {
@@ -1846,11 +1604,9 @@ function setupNavigation() {
               )
           );
 
-
           button.classList.add(
             "active"
           );
-
 
           if (
             index === 0
@@ -1877,15 +1633,11 @@ function setupNavigation() {
             setMainView(
               "rules"
             );
-
           }
-
         }
       );
-
     }
   );
-
 }
 
 
@@ -1898,36 +1650,36 @@ function startApp() {
   const confirmBtn =
     $("confirmBtn");
 
-
-  if (confirmBtn) {
+  if (
+    confirmBtn
+  ) {
 
     confirmBtn.addEventListener(
       "click",
       saveSelection
     );
-
   }
-
 
   setupNavigation();
 
-
-  loadPlayer();
-
+  loadPlayer(false);
 
   setInterval(
     updateCountdown,
     1000
   );
 
+  /*
+    Background refresh every 30 seconds.
 
+    If Supabase temporarily fails, the new loadPlayer()
+    keeps the existing working dashboard on screen.
+  */
   setInterval(
-    loadPlayer,
+    () => loadPlayer(true),
     30000
   );
-
 }
-
 
 if (
   document.readyState ===
@@ -1942,5 +1694,4 @@ if (
 } else {
 
   startApp();
-
 }
