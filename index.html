@@ -1,34 +1,45 @@
 <!doctype html>
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
+
 <meta
   name="viewport"
   content="width=device-width,initial-scale=1,viewport-fit=cover"
 >
+
 <meta
   name="theme-color"
   content="#0b1220"
 >
+
 <meta
   name="apple-mobile-web-app-capable"
   content="yes"
 >
+
 <title>Last Man Standing</title>
 
 <link
   rel="stylesheet"
   href="styles.css"
 >
+
 </head>
+
 
 <body>
 
+
 <div class="app-shell">
+
 
 <header class="topbar">
 
   <div>
+
     <div class="eyebrow">
       LAST MAN STANDING
     </div>
@@ -36,13 +47,17 @@
     <h1>
       Football Challenge
     </h1>
+
   </div>
 
   <div class="status-dot"></div>
 
 </header>
 
+
+
 <main>
+
 
 <section class="hero-card">
 
@@ -67,6 +82,7 @@
 
     </div>
 
+
     <div class="countdown">
 
       <span>
@@ -82,6 +98,7 @@
   </div>
 
 </section>
+
 
 
 <section class="player-card">
@@ -100,6 +117,7 @@
 
     </div>
 
+
     <span class="badge alive">
       ALIVE
     </span>
@@ -107,9 +125,11 @@
   </div>
 
 
+
   <div class="stat-grid">
 
     <div>
+
       <span>
         Teams used
       </span>
@@ -117,10 +137,12 @@
       <strong>
         0
       </strong>
+
     </div>
 
 
     <div>
+
       <span>
         Missed picks
       </span>
@@ -128,10 +150,12 @@
       <strong>
         0
       </strong>
+
     </div>
 
 
     <div>
+
       <span>
         Entry
       </span>
@@ -139,6 +163,7 @@
       <strong>
         £5
       </strong>
+
     </div>
 
   </div>
@@ -146,7 +171,9 @@
 </section>
 
 
+
 <section class="selection-card">
+
 
   <div class="section-title">
 
@@ -162,6 +189,7 @@
 
     </div>
 
+
     <span
       class="lock-pill"
       id="lockPill"
@@ -170,6 +198,7 @@
     </span>
 
   </div>
+
 
 
   <div
@@ -184,6 +213,7 @@
   </div>
 
 
+
   <button
     class="primary-btn"
     id="confirmBtn"
@@ -191,6 +221,7 @@
   >
     Confirm selection
   </button>
+
 
 
   <p
@@ -203,7 +234,13 @@
 </section>
 
 
+
+<!-- =====================================================
+     FULL RULES
+     ===================================================== -->
+
 <section class="rules-card">
+
 
   <div class="section-title">
 
@@ -214,7 +251,7 @@
       </span>
 
       <h2>
-        Last Man Standing
+        Last Man Standing Rules
       </h2>
 
     </div>
@@ -222,34 +259,202 @@
   </div>
 
 
+
   <ul>
 
-    <li>
-      Pick one Premier League team to win each round.
-    </li>
 
     <li>
-      Win and you go through. Draw or lose and you're out.
+      <strong>1. The game</strong><br>
+      Last Man Standing is a football prediction game for fun.
+      Each week every entrant selects one Premier League team
+      to win its match.
     </li>
 
-    <li>
-      You cannot use the same team twice.
-    </li>
 
     <li>
-      Selections lock at the published deadline.
+      <strong>2. Going through</strong><br>
+      If your selected team wins, you go through to the next
+      round. If your selected team draws or loses, you are
+      eliminated.
     </li>
+
+
+    <li>
+      <strong>3. Entry fee</strong><br>
+      The standard entry fee is £5 per player. Entry fees are
+      paid to the organiser. The app does not process payments.
+    </li>
+
+
+    <li>
+      <strong>4. Normal weekly deadline</strong><br>
+      For a normal weekend round, selections must be made by
+      18:00 on Friday.
+    </li>
+
+
+    <li>
+      <strong>5. Midweek rounds</strong><br>
+      For a midweek round, the deadline is 18:00 on the day
+      the round starts. This rule takes priority over the
+      normal Friday deadline. If a round covers several days,
+      the deadline remains 18:00 on the first day of the round.
+    </li>
+
+
+    <li>
+      <strong>6. Missed selection</strong><br>
+      If no selection is made by the deadline, the player will
+      receive the next available team from the bottom of the
+      league upwards, starting with the lowest-ranked team they
+      have not previously used, provided that team is actually
+      playing in that round. The first missed selection results
+      in a warning. A second missed selection results in
+      elimination.
+    </li>
+
+
+    <li>
+      <strong>7. Same team cannot be used twice</strong><br>
+      A team can only be selected once during the competition.
+      This applies to normal selections, replacement selections
+      and automatic selections.
+    </li>
+
+
+    <li>
+      <strong>8. Changing your selection</strong><br>
+      Your selection can be changed any number of times before
+      the published deadline. At 18:00 the selection is locked
+      and cannot normally be changed. The final selection at
+      the deadline is the one that counts.
+    </li>
+
+
+    <li>
+      <strong>9. Published selections</strong><br>
+      Once selections are locked, the selections are published
+      so that everyone can see the full list before the new
+      game starts.
+    </li>
+
+
+    <li>
+      <strong>10. Postponed fixtures</strong><br>
+      If your selected fixture is postponed after the round has
+      started, you go through that round, but the selected team
+      remains unavailable for future selections.
+      <br><br>
+      If the fixture is postponed more than two hours before
+      kick-off, you must select a replacement team. The
+      replacement can be selected until the replacement team's
+      kick-off.
+      <br><br>
+      If the postponement occurs less than two hours before
+      kick-off, the fixture is treated as abandoned under the
+      abandoned-game rules.
+    </li>
+
+
+    <li>
+      <strong>11. Abandoned fixtures</strong><br>
+      An abandoned selected game follows the postponed-game
+      rules. Other results in the round normally stand.
+      However, if the Last Man Standing competition would be
+      won because of the postponed or abandoned game, all games
+      in that round are abandoned and nobody can be declared
+      the winner for that round.
+    </li>
+
+
+    <li>
+      <strong>12. Competition cannot be won by a postponed or abandoned game</strong><br>
+      A Last Man Standing competition cannot be declared won
+      because of a postponed or abandoned fixture.
+    </li>
+
+
+    <li>
+      <strong>13. Postponement before the round starts</strong><br>
+      If a selected fixture is postponed before the round begins,
+      the player must select another team.
+      <br><br>
+      If the postponement occurs after the 18:00 deadline but
+      before the round starts, the replacement team can be
+      selected until that replacement team's kick-off.
+      The replacement team cannot have been used previously.
+    </li>
+
+
+    <li>
+      <strong>14. Rollover</strong><br>
+      The competition must be won by an individual player.
+      If there is no individual winner, the prize pot rolls over.
+      <br><br>
+      Existing participants who re-enter pay £5.
+      New players pay an increased entry fee according to the
+      rollover number.
+      <br><br>
+      On rollover 1:
+      existing players £5, new players £10.
+      <br><br>
+      On rollover 2:
+      existing players £5, new players £15.
+      <br><br>
+      On rollover 3:
+      existing players £5, new players £20.
+      <br><br>
+      The existing prize pot is preserved.
+    </li>
+
+
+    <li>
+      <strong>15. Players who do not re-enter</strong><br>
+      A player who does not re-enter a rollover has no claim
+      to any money in the prize pot.
+    </li>
+
+
+    <li>
+      <strong>16. End of Premier League season</strong><br>
+      If the competition is still running when the Premier League
+      season ends, the competition pauses and restarts with the
+      surviving players in the following season.
+      <br><br>
+      This is not a rollover. Previous team selections remain
+      unavailable and the players do not reset their used teams
+      or pay an additional £5 simply because the season has ended.
+    </li>
+
+
+    <li>
+      <strong>17. Payment</strong><br>
+      All fees must normally be paid before the relevant game
+      commences unless the organiser has agreed otherwise.
+      Players whose payment is not received can be removed from
+      the competition.
+      <br><br>
+      The organiser can mark a player as paid, payment due,
+      waived/approved or removed.
+    </li>
+
 
   </ul>
 
+
 </section>
+
 
 </main>
 
 
+
 <nav class="bottom-nav">
 
-  <button class="nav-item active">
+
+  <button
+    class="nav-item active"
+  >
 
     <span>
       ⌂
@@ -262,7 +467,10 @@
   </button>
 
 
-  <button class="nav-item">
+
+  <button
+    class="nav-item"
+  >
 
     <span>
       ▣
@@ -275,7 +483,10 @@
   </button>
 
 
-  <button class="nav-item">
+
+  <button
+    class="nav-item"
+  >
 
     <span>
       ℹ
@@ -287,19 +498,19 @@
 
   </button>
 
+
 </nav>
+
 
 </div>
 
 
-<!-- IMPORTANT:
-     This is deliberately v3.
-     It forces the phone to load
-     the new app.js instead of its
-     cached v2 copy.
--->
+
+<!-- Force the phone to load the current JavaScript -->
 
 <script src="app.js?v=7"></script>
 
+
 </body>
+
 </html>
