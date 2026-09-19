@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Last Man Standing</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app-shell">
+<header class="topbar"><div><div class="eyebrow">LAST MAN STANDING</div><h1>Football Challenge</h1></div><div class="status-dot"></div></header>
+<main>
+<section class="hero-card"><div class="hero-label">CURRENT ROUND</div><div class="hero-row"><div><div class="round-number" id="roundNumber">Round 1</div><div class="hero-status">Waiting to start</div></div><div class="countdown"><span>DEADLINE</span><strong id="countdown">--:--:--</strong></div></div></section>
+<section class="player-card"><div class="player-heading"><div><span class="muted">PLAYER</span><h2 id="playerName">Guest Player</h2></div><span class="badge alive">ALIVE</span></div><div class="stat-grid"><div><span>Teams used</span><strong>0</strong></div><div><span>Missed picks</span><strong>0</strong></div><div><span>Entry</span><strong>£5</strong></div></div></section>
+<section class="selection-card"><div class="section-title"><div><span class="muted">YOUR SELECTION</span><h2 id="selectionTitle">Choose your team</h2></div><span class="lock-pill" id="lockPill">OPEN</span></div><div id="fixtures" class="fixture-list"><div class="empty-state">Fixtures will appear here when the competition is opened.</div></div><button class="primary-btn" id="confirmBtn" disabled>Confirm selection</button><p class="hint" id="selectionHint">Your selection can be changed until the deadline.</p></section>
+<section class="rules-card"><div class="section-title"><div><span class="muted">HOW IT WORKS</span><h2>Last Man Standing</h2></div></div><ul><li>Pick one Premier League team to win each round.</li><li>Win and you go through. Draw or lose and you're out.</li><li>You cannot use the same team twice.</li><li>Selections lock at the published deadline.</li></ul></section>
+</main>
+<nav class="bottom-nav"><button class="nav-item active"><span>⌂</span><small>Home</small></button><button class="nav-item"><span>▣</span><small>History</small></button><button class="nav-item"><span>ℹ</span><small>Rules</small></button></nav>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
