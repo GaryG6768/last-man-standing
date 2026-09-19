@@ -63,7 +63,7 @@ async function callRpc(name, body) {
 
   if (!response.ok) {
 
-    throw new Error(
+    const message =
       (
         data &&
         (
@@ -72,8 +72,9 @@ async function callRpc(name, body) {
           data.hint
         )
       ) ||
-      `Supabase RPC error ${response.status}`
-    );
+      `Supabase RPC error ${response.status}`;
+
+    throw new Error(message);
 
   }
 
@@ -97,7 +98,6 @@ function money(value) {
   const n =
     Number(value);
 
-
   return Number.isFinite(n)
     ? `£${n}`
     : "£5";
@@ -111,10 +111,8 @@ function formatDate(value) {
     return "";
   }
 
-
   const d =
     new Date(value);
-
 
   if (
     Number.isNaN(
@@ -123,7 +121,6 @@ function formatDate(value) {
   ) {
     return "";
   }
-
 
   return d.toLocaleString(
     "en-GB",
@@ -143,7 +140,6 @@ function normaliseDashboard(raw) {
 
   const data =
     first(raw) || {};
-
 
   return {
 
@@ -186,19 +182,15 @@ function getUsedTeams() {
   const names =
     new Set();
 
-
-  const used =
+  (
     state.data?.used_teams ||
-    [];
-
-
-  used.forEach(
+    []
+  ).forEach(
     (team) => {
 
       if (!team) {
         return;
       }
-
 
       if (
         typeof team ===
@@ -215,7 +207,6 @@ function getUsedTeams() {
 
       }
 
-
       const id =
         team.team_id ||
         team.id;
@@ -225,7 +216,6 @@ function getUsedTeams() {
         team.name ||
         team.short_name;
 
-
       if (id) {
 
         ids.add(
@@ -233,7 +223,6 @@ function getUsedTeams() {
         );
 
       }
-
 
       if (name) {
 
@@ -247,7 +236,6 @@ function getUsedTeams() {
 
     }
   );
-
 
   return {
     ids,
@@ -274,7 +262,6 @@ function isTeamUsed(
 
   }
 
-
   if (
     teamName &&
     used.names.has(
@@ -287,7 +274,6 @@ function isTeamUsed(
     return true;
 
   }
-
 
   return false;
 
@@ -352,16 +338,91 @@ function getFixtureAwayName(
 }
 
 
+function getTeamNameFromFixture(
+  fixture,
+  teamId
+) {
+
+  if (!fixture) {
+    return "Team selected";
+  }
+
+  if (
+    String(
+      getFixtureHomeId(
+        fixture
+      )
+    ) ===
+    String(teamId)
+  ) {
+
+    return getFixtureHomeName(
+      fixture
+    );
+
+  }
+
+  if (
+    String(
+      getFixtureAwayId(
+        fixture
+      )
+    ) ===
+    String(teamId)
+  ) {
+
+    return getFixtureAwayName(
+      fixture
+    );
+
+  }
+
+  return "Team selected";
+
+}
+
+
+function deadlinePassed() {
+
+  if (!state.deadline) {
+    return false;
+  }
+
+  const time =
+    new Date(
+      state.deadline
+    ).getTime();
+
+  return (
+    Number.isFinite(time) &&
+    time <= Date.now()
+  );
+
+}
+
+
+function roundIsOpen() {
+
+  const round =
+    state.data?.current_round ||
+    {};
+
+  return (
+    round.status === "open" &&
+    !deadlinePassed()
+  );
+
+}
+
+
 function renderDashboard() {
 
   const d =
     state.data;
 
-
   if (!d) {
     return;
   }
-
 
   const player =
     d.player || {};
@@ -422,6 +483,14 @@ function renderDashboard() {
     statusText =
       "Round completed";
 
+  } else if (
+    round.status ===
+    "upcoming"
+  ) {
+
+    statusText =
+      "Waiting to start";
+
   }
 
 
@@ -453,10 +522,8 @@ function renderDashboard() {
         "alive"
       ).toUpperCase();
 
-
     badge.textContent =
       status;
-
 
     badge.className =
       "badge " +
@@ -486,11 +553,9 @@ function renderDashboard() {
         []
       ).length;
 
-
     stats[1].textContent =
       player.missed_selection_count ??
       0;
-
 
     stats[2].textContent =
       money(
@@ -533,52 +598,29 @@ function renderDashboard() {
                 fixture
               )
             ) ===
-              String(
-                state.selectionTeamId
-              ) ||
+            String(
+              state.selectionTeamId
+            ) ||
 
             String(
               getFixtureAwayId(
                 fixture
               )
             ) ===
-              String(
-                state.selectionTeamId
-              )
+            String(
+              state.selectionTeamId
+            )
           );
 
         }
       );
 
 
-    if (selectedFixture) {
-
-      if (
-        String(
-          getFixtureHomeId(
-            selectedFixture
-          )
-        ) ===
-        String(
-          state.selectionTeamId
-        )
-      ) {
-
-        selectedTeamName =
-          getFixtureHomeName(
-            selectedFixture
-          );
-
-      } else {
-
-        selectedTeamName =
-          getFixtureAwayName(
-            selectedFixture
-          );
-
-      }
-
-    }
+    selectedTeamName =
+      getTeamNameFromFixture(
+        selectedFixture,
+        state.selectionTeamId
+      );
 
   }
 
@@ -591,8 +633,7 @@ function renderDashboard() {
 
   $("lockPill")
     .textContent =
-    round.status ===
-    "open"
+    roundIsOpen()
       ? "OPEN"
       : String(
           round.status ||
@@ -609,21 +650,17 @@ function renderDashboard() {
 
   if (hint) {
 
-    if (
+    hint.textContent =
       selectedTeamName
-    ) {
 
-      hint.textContent =
-        `Your current selection is ${selectedTeamName}. You can change it until the deadline.`;
+        ? `Your current selection is ${selectedTeamName}. You can change it until the deadline.`
 
-    } else {
-
-      hint.textContent =
-        "Choose one Premier League team to win its game.";
-
-    }
+        : "Choose one Premier League team to win its game.";
 
   }
+
+
+  updateCountdown();
 
 }
 
@@ -633,33 +670,15 @@ function renderFixtures() {
   const el =
     $("fixtures");
 
-
   const fixtures =
     state.data?.fixtures ||
     [];
 
-
   const used =
     getUsedTeams();
 
-
-  const round =
-    state.data?.current_round ||
-    {};
-
-
-  const deadlinePassed =
-    state.deadline &&
-    new Date(
-      state.deadline
-    ).getTime() <=
-      Date.now();
-
-
-  const roundIsOpen =
-    round.status ===
-      "open" &&
-    !deadlinePassed;
+  const open =
+    roundIsOpen();
 
 
   if (
@@ -673,10 +692,8 @@ function renderFixtures() {
         </div>
       `;
 
-
     $("confirmBtn")
       .disabled = true;
-
 
     return;
 
@@ -693,30 +710,25 @@ function renderFixtures() {
               fixture
             );
 
-
           const awayId =
             getFixtureAwayId(
               fixture
             );
-
 
           const home =
             getFixtureHomeName(
               fixture
             );
 
-
           const away =
             getFixtureAwayName(
               fixture
             );
 
-
           const kickoff =
             formatDate(
               fixture.kickoff_time
             );
-
 
           const fixtureStatus =
             fixture.status ||
@@ -728,23 +740,21 @@ function renderFixtures() {
             name
           ) {
 
-            const usedAlready =
-              isTeamUsed(
-                id,
-                name,
-                used
-              ) &&
-              String(id) !==
-                String(
-                  state.selectionTeamId
-                );
-
-
             const selected =
+              state.selectionTeamId &&
               String(
                 state.selectionTeamId
               ) ===
               String(id);
+
+
+            const usedAlready =
+              !selected &&
+              isTeamUsed(
+                id,
+                name,
+                used
+              );
 
 
             const unavailable =
@@ -755,7 +765,7 @@ function renderFixtures() {
             const disabled =
               usedAlready ||
               unavailable ||
-              !roundIsOpen;
+              !open;
 
 
             let label =
@@ -784,7 +794,7 @@ function renderFixtures() {
                 ).toUpperCase();
 
             } else if (
-              !roundIsOpen
+              !open
             ) {
 
               label =
@@ -795,6 +805,7 @@ function renderFixtures() {
 
             const usedStyle =
               usedAlready
+
                 ? `
                   style="
                     background:#3a3f48;
@@ -804,6 +815,7 @@ function renderFixtures() {
                     cursor:not-allowed;
                   "
                 `
+
                 : "";
 
 
@@ -849,13 +861,11 @@ function renderFixtures() {
                   ${home} v ${away}
                 </div>
 
-
                 <div
                   class="fixture-time"
                 >
                   ${kickoff}
                 </div>
-
 
                 <div
                   style="
@@ -920,58 +930,29 @@ function renderFixtures() {
                         fixture
                       )
                     ) ===
-                      String(
-                        state.selectionTeamId
-                      ) ||
+                    String(
+                      state.selectionTeamId
+                    ) ||
 
                     String(
                       getFixtureAwayId(
                         fixture
                       )
                     ) ===
-                      String(
-                        state.selectionTeamId
-                      )
+                    String(
+                      state.selectionTeamId
+                    )
                   );
 
                 }
               );
 
 
-            let teamName =
-              "Team selected";
-
-
-            if (
-              selectedFixture
-            ) {
-
-              if (
-                String(
-                  getFixtureHomeId(
-                    selectedFixture
-                  )
-                ) ===
-                String(
-                  state.selectionTeamId
-                )
-              ) {
-
-                teamName =
-                  getFixtureHomeName(
-                    selectedFixture
-                  );
-
-              } else {
-
-                teamName =
-                  getFixtureAwayName(
-                    selectedFixture
-                  );
-
-              }
-
-            }
+            const teamName =
+              getTeamNameFromFixture(
+                selectedFixture,
+                state.selectionTeamId
+              );
 
 
             $("selectionTitle")
@@ -985,8 +966,7 @@ function renderFixtures() {
 
 
             $("confirmBtn")
-              .disabled =
-              false;
+              .disabled = false;
 
 
             renderFixtures();
@@ -1001,7 +981,7 @@ function renderFixtures() {
   $("confirmBtn")
     .disabled =
     !state.selectionTeamId ||
-    !roundIsOpen;
+    !open;
 
 }
 
@@ -1023,9 +1003,9 @@ async function saveSelection() {
 
   if (!round?.id) {
 
-    alert(
-      "There is no open round."
-    );
+    $("selectionHint")
+      .textContent =
+      "There is no open round.";
 
     return;
 
@@ -1091,6 +1071,7 @@ async function saveSelection() {
   } catch (error) {
 
     console.error(
+      "Selection error:",
       error
     );
 
@@ -1115,4 +1096,345 @@ async function saveSelection() {
 
 async function loadPlayer() {
 
-  try
+  try {
+
+    const raw =
+      await callRpc(
+        "get_lms_player_data",
+        {
+          p_player_code:
+            PLAYER_CODE
+        }
+      );
+
+
+    const data =
+      normaliseDashboard(
+        raw
+      );
+
+
+    if (
+      !data.success
+    ) {
+
+      throw new Error(
+        "Player data could not be loaded."
+      );
+
+    }
+
+
+    state.data =
+      data;
+
+
+    renderDashboard();
+
+
+  } catch (error) {
+
+    console.error(
+      "Load player error:",
+      error
+    );
+
+
+    $("playerName")
+      .textContent =
+      "Connection error";
+
+
+    $("roundNumber")
+      .textContent =
+      "Unable to load";
+
+
+    const heroStatus =
+      document.querySelector(
+        ".hero-status"
+      );
+
+
+    if (heroStatus) {
+
+      heroStatus.textContent =
+        "Please refresh the app";
+
+    }
+
+
+    $("selectionTitle")
+      .textContent =
+      "Unable to load competition";
+
+
+    $("fixtures")
+      .innerHTML =
+      `
+        <div class="empty-state">
+          ${
+            error?.message ||
+            "Could not connect to the competition."
+          }
+        </div>
+      `;
+
+
+    $("confirmBtn")
+      .disabled =
+      true;
+
+  }
+
+}
+
+
+function updateCountdown() {
+
+  const el =
+    $("countdown");
+
+
+  if (!el) {
+    return;
+  }
+
+
+  if (!state.deadline) {
+
+    el.textContent =
+      "--:--:--";
+
+    return;
+
+  }
+
+
+  const end =
+    new Date(
+      state.deadline
+    ).getTime();
+
+
+  if (
+    !Number.isFinite(end)
+  ) {
+
+    el.textContent =
+      "--:--:--";
+
+    return;
+
+  }
+
+
+  const remaining =
+    Math.max(
+      0,
+      end - Date.now()
+    );
+
+
+  if (
+    remaining === 0
+  ) {
+
+    el.textContent =
+      "00:00:00";
+
+    return;
+
+  }
+
+
+  const totalSeconds =
+    Math.floor(
+      remaining / 1000
+    );
+
+
+  const days =
+    Math.floor(
+      totalSeconds /
+      86400
+    );
+
+
+  const hours =
+    Math.floor(
+      (
+        totalSeconds %
+        86400
+      ) / 3600
+    );
+
+
+  const minutes =
+    Math.floor(
+      (
+        totalSeconds %
+        3600
+      ) / 60
+    );
+
+
+  const seconds =
+    totalSeconds %
+    60;
+
+
+  if (
+    days > 0
+  ) {
+
+    el.textContent =
+      `${days}d ` +
+      `${String(hours).padStart(2, "0")}:` +
+      `${String(minutes).padStart(2, "0")}:` +
+      `${String(seconds).padStart(2, "0")}`;
+
+  } else {
+
+    el.textContent =
+      `${String(hours).padStart(2, "0")}:` +
+      `${String(minutes).padStart(2, "0")}:` +
+      `${String(seconds).padStart(2, "0")}`;
+
+  }
+
+}
+
+
+function setupNavigation() {
+
+  const buttons =
+    document.querySelectorAll(
+      ".nav-item"
+    );
+
+
+  buttons.forEach(
+    (button, index) => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          buttons.forEach(
+            (b) =>
+              b.classList.remove(
+                "active"
+              )
+          );
+
+
+          button.classList.add(
+            "active"
+          );
+
+
+          if (
+            index === 0
+          ) {
+
+            window.scrollTo(
+              {
+                top: 0,
+                behavior:
+                  "smooth"
+              }
+            );
+
+          } else if (
+            index === 1
+          ) {
+
+            $("selectionHint")
+              .textContent =
+              "History will be available here as rounds are completed.";
+
+          } else if (
+            index === 2
+          ) {
+
+            const rules =
+              document.querySelector(
+                ".rules-card"
+              );
+
+            if (rules) {
+
+              rules.scrollIntoView(
+                {
+                  behavior:
+                    "smooth",
+                  block:
+                    "start"
+                }
+              );
+
+            }
+
+          }
+
+        }
+      );
+
+    }
+  );
+
+}
+
+
+function startApp() {
+
+  const confirmBtn =
+    $("confirmBtn");
+
+
+  if (confirmBtn) {
+
+    confirmBtn.addEventListener(
+      "click",
+      saveSelection
+    );
+
+  }
+
+
+  setupNavigation();
+
+
+  loadPlayer();
+
+
+  setInterval(
+    updateCountdown,
+    1000
+  );
+
+
+  setInterval(
+    loadPlayer,
+    30000
+  );
+
+}
+
+
+if (
+  document.readyState ===
+  "loading"
+) {
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    startApp
+  );
+
+} else {
+
+  startApp();
+
+}
