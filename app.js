@@ -972,6 +972,11 @@ function renderFixtures() {
               .disabled = false;
 
 
+            $("confirmBtn")
+              .textContent =
+              "Confirm selection";
+
+
             renderFixtures();
 
           }
@@ -1062,13 +1067,13 @@ async function saveSelection() {
       "Selection saved";
 
 
+    button.disabled =
+      true;
+
+
     $("selectionHint")
       .textContent =
-      result?.message ||
-      "Selection saved successfully.";
-
-
-    await loadPlayer();
+      "Selection saved successfully. You can change it until the deadline.";
 
 
   } catch (error) {
@@ -1455,7 +1460,7 @@ function resultStyle(result) {
     value === "draw"
   ) {
 
-    return "color:#fcd34d;";
+    return "color:#fcd34a;";
 
   }
 
