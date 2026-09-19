@@ -1,9 +1,5 @@
-const SUPABASE_URL =
-  "https://tkhykusvmsceleflynok.supabase.co";
-
-const SUPABASE_KEY =
-  "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
-
+const SUPABASE_URL = "https://tkhykusvmsceleflynok.supabase.co";
+const SUPABASE_KEY = "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
 const PLAYER_CODE = "GARY";
 
 const state = {
@@ -15,250 +11,35 @@ const state = {
   isLoading: false,
   hasLoadedOnce: false,
   pendingSelection: false,
-  lastLoadError: null,
-  refreshing: false
+  lastLoadError: null
 };
 
-const $ = (id) =>
-  document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 
+async function callRpc(name, body) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
 
-/* =====================================================
-   PROFESSIONAL MOBILE REFRESH
-   ===================================================== */
-
-function setupRefreshStyle() {
-
-  if (
-    document.getElementById(
-      "professionalRefreshStyle"
-    )
-  ) {
-    return;
-  }
-
-  const style =
-    document.createElement("style");
-
-  style.id =
-    "professionalRefreshStyle";
-
-  style.textContent = `
-    html,
-    body {
-      overscroll-behavior-y: contain;
-    }
-
-    #refreshIndicator {
-      position: fixed;
-      top: -54px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 9999;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: #18243a;
-      border: 1px solid rgba(255,255,255,.10);
-      box-shadow: 0 8px 24px rgba(0,0,0,.30);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition:
-        top .22s ease,
-        opacity .22s ease;
-      pointer-events: none;
-    }
-
-    #refreshIndicator.show {
-      top: 12px;
-      opacity: 1;
-    }
-
-    #refreshIndicator.spinning span {
-      animation:
-        refreshSpin .8s linear infinite;
-    }
-
-    #refreshIndicator span {
-      display: block;
-      width: 19px;
-      height: 19px;
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,.25);
-      border-top-color: #60a5fa;
-    }
-
-    @keyframes refreshSpin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    #refreshMessage {
-      position: fixed;
-      top: 64px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 9998;
-      padding: 7px 14px;
-      border-radius: 20px;
-      background: rgba(11,18,32,.94);
-      border: 1px solid rgba(255,255,255,.08);
-      color: #aebbd0;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: .03em;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .2s ease;
-    }
-
-    #refreshMessage.show {
-      opacity: 1;
-    }
-  `;
-
-  document.head.appendChild(style);
-
-  const indicator =
-    document.createElement("div");
-
-  indicator.id =
-    "refreshIndicator";
-
-  indicator.innerHTML =
-    "<span></span>";
-
-  document.body.appendChild(
-    indicator
-  );
-
-  const message =
-    document.createElement("div");
-
-  message.id =
-    "refreshMessage";
-
-  message.textContent =
-    "Refreshing…";
-
-  document.body.appendChild(
-    message
-  );
-}
-
-function showRefreshIndicator() {
-
-  setupRefreshStyle();
-
-  const indicator =
-    $("refreshIndicator");
-
-  const message =
-    $("refreshMessage");
-
-  if (indicator) {
-    indicator.classList.add(
-      "show",
-      "spinning"
-    );
-  }
-
-  if (message) {
-    message.classList.add(
-      "show"
-    );
-  }
-}
-
-function hideRefreshIndicator() {
-
-  const indicator =
-    $("refreshIndicator");
-
-  const message =
-    $("refreshMessage");
-
-  if (indicator) {
-    indicator.classList.remove(
-      "spinning"
-    );
-
-    setTimeout(() => {
-      indicator.classList.remove(
-        "show"
-      );
-    }, 180);
-  }
-
-  if (message) {
-    message.classList.remove(
-      "show"
-    );
-  }
-}
-
-
-/* =====================================================
-   SUPABASE
-   ===================================================== */
-
-async function callRpc(
-  name,
-  body
-) {
-
-  const response =
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/${name}`,
-      {
-        method: "POST",
-
-        headers: {
-          apikey:
-            SUPABASE_KEY,
-
-          Authorization:
-            `Bearer ${SUPABASE_KEY}`,
-
-          "Content-Type":
-            "application/json"
-        },
-
-        body:
-          JSON.stringify(body)
-      }
-    );
-
-  const text =
-    await response.text();
-
+  const text = await response.text();
   let data = null;
 
   try {
-    data =
-      text
-        ? JSON.parse(text)
-        : null;
+    data = text ? JSON.parse(text) : null;
   } catch {
     data = text;
   }
 
   if (!response.ok) {
-
     const message =
-      (
-        data &&
-        (
-          data.message ||
-          data.error ||
-          data.hint
-        )
-      ) ||
+      (data && (data.message || data.error || data.hint)) ||
       `Supabase RPC error ${response.status}`;
-
     throw new Error(message);
   }
 
@@ -266,171 +47,79 @@ async function callRpc(
 }
 
 function first(value) {
-  return Array.isArray(value)
-    ? value[0]
-    : value;
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function money(value) {
-
-  const n =
-    Number(value);
-
-  return Number.isFinite(n)
-    ? `£${n}`
-    : "£5";
+  const n = Number(value);
+  return Number.isFinite(n) ? `£${n}` : "£5";
 }
 
 function formatDate(value) {
+  if (!value) return "";
 
-  if (!value) {
-    return "";
-  }
+  const d = new Date(value);
 
-  const d =
-    new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
 
-  if (
-    Number.isNaN(
-      d.getTime()
-    )
-  ) {
-    return "";
-  }
-
-  return d.toLocaleString(
-    "en-GB",
-    {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
+  return d.toLocaleString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
-
-/* =====================================================
-   DATA
-   ===================================================== */
-
 function normaliseDashboard(raw) {
-
-  const data =
-    first(raw) || {};
+  const data = first(raw) || {};
 
   return {
-    success:
-      data.success !== false,
-
-    player:
-      data.player || {},
-
-    competition:
-      data.competition || {},
-
-    current_round:
-      data.current_round ||
-      data.round ||
-      {},
-
-    selection:
-      data.selection || null,
-
-    used_teams:
-      data.used_teams || [],
-
-    fixtures:
-      data.fixtures || []
+    success: data.success !== false,
+    player: data.player || {},
+    competition: data.competition || {},
+    current_round: data.current_round || data.round || {},
+    selection: data.selection || null,
+    used_teams: data.used_teams || [],
+    fixtures: data.fixtures || []
   };
 }
 
 function getUsedTeams() {
+  const ids = new Set();
+  const names = new Set();
 
-  const ids =
-    new Set();
+  (state.data?.used_teams || []).forEach((team) => {
+    if (!team) return;
 
-  const names =
-    new Set();
-
-  (
-    state.data?.used_teams ||
-    []
-  ).forEach(
-    (team) => {
-
-      if (!team) {
-        return;
-      }
-
-      if (
-        typeof team ===
-        "string"
-      ) {
-
-        names.add(
-          team
-            .trim()
-            .toLowerCase()
-        );
-
-        return;
-      }
-
-      const id =
-        team.team_id ||
-        team.id;
-
-      const name =
-        team.team_name ||
-        team.name ||
-        team.short_name;
-
-      if (id) {
-        ids.add(
-          String(id)
-        );
-      }
-
-      if (name) {
-        names.add(
-          String(name)
-            .trim()
-            .toLowerCase()
-        );
-      }
+    if (typeof team === "string") {
+      names.add(team.trim().toLowerCase());
+      return;
     }
-  );
 
-  return {
-    ids,
-    names
-  };
+    const id = team.team_id || team.id;
+    const name = team.team_name || team.name || team.short_name;
+
+    if (id) {
+      ids.add(String(id));
+    }
+
+    if (name) {
+      names.add(String(name).trim().toLowerCase());
+    }
+  });
+
+  return { ids, names };
 }
 
-function isTeamUsed(
-  teamId,
-  teamName,
-  used
-) {
-
-  if (
-    teamId &&
-    used.ids.has(
-      String(teamId)
-    )
-  ) {
+function isTeamUsed(teamId, teamName, used) {
+  if (teamId && used.ids.has(String(teamId))) {
     return true;
   }
 
   if (
     teamName &&
-    used.names.has(
-      String(teamName)
-        .trim()
-        .toLowerCase()
-    )
+    used.names.has(String(teamName).trim().toLowerCase())
   ) {
     return true;
   }
@@ -438,10 +127,7 @@ function isTeamUsed(
   return false;
 }
 
-function getFixtureHomeId(
-  fixture
-) {
-
+function getFixtureHomeId(fixture) {
   return (
     fixture.home_team_id ||
     fixture.home_id ||
@@ -450,10 +136,7 @@ function getFixtureHomeId(
   );
 }
 
-function getFixtureAwayId(
-  fixture
-) {
-
+function getFixtureAwayId(fixture) {
   return (
     fixture.away_team_id ||
     fixture.away_id ||
@@ -462,10 +145,7 @@ function getFixtureAwayId(
   );
 }
 
-function getFixtureHomeName(
-  fixture
-) {
-
+function getFixtureHomeName(fixture) {
   return (
     fixture.home_name ||
     fixture.home_team ||
@@ -475,10 +155,7 @@ function getFixtureHomeName(
   );
 }
 
-function getFixtureAwayName(
-  fixture
-) {
-
+function getFixtureAwayName(fixture) {
   return (
     fixture.away_name ||
     fixture.away_team ||
@@ -488,56 +165,35 @@ function getFixtureAwayName(
   );
 }
 
-function getTeamNameFromFixture(
-  fixture,
-  teamId
-) {
-
+function getTeamNameFromFixture(fixture, teamId) {
   if (!fixture) {
     return "Team selected";
   }
 
   if (
-    String(
-      getFixtureHomeId(
-        fixture
-      )
-    ) ===
+    String(getFixtureHomeId(fixture)) ===
     String(teamId)
   ) {
-
-    return getFixtureHomeName(
-      fixture
-    );
+    return getFixtureHomeName(fixture);
   }
 
   if (
-    String(
-      getFixtureAwayId(
-        fixture
-      )
-    ) ===
+    String(getFixtureAwayId(fixture)) ===
     String(teamId)
   ) {
-
-    return getFixtureAwayName(
-      fixture
-    );
+    return getFixtureAwayName(fixture);
   }
 
   return "Team selected";
 }
 
 function deadlinePassed() {
-
   if (!state.deadline) {
     return false;
   }
 
   const time =
-    new Date(
-      state.deadline
-    ).getTime();
+    new Date(state.deadline).getTime();
 
   return (
     Number.isFinite(time) &&
@@ -546,27 +202,17 @@ function deadlinePassed() {
 }
 
 function roundIsOpen() {
-
   const round =
-    state.data?.current_round ||
-    {};
+    state.data?.current_round || {};
 
   return (
-    round.status ===
-      "open" &&
+    round.status === "open" &&
     !deadlinePassed()
   );
 }
 
-
-/* =====================================================
-   DASHBOARD
-   ===================================================== */
-
 function renderDashboard() {
-
-  const d =
-    state.data;
+  const d = state.data;
 
   if (!d) {
     return;
@@ -581,13 +227,10 @@ function renderDashboard() {
   const round =
     d.current_round || {};
 
-  $("playerName")
-    .textContent =
-    player.name ||
-    PLAYER_CODE;
+  $("playerName").textContent =
+    player.name || PLAYER_CODE;
 
-  $("roundNumber")
-    .textContent =
+  $("roundNumber").textContent =
     round.round_number
       ? `Round ${round.round_number}`
       : "Waiting";
@@ -596,34 +239,23 @@ function renderDashboard() {
     "Waiting to start";
 
   if (
-    round.status ===
-    "open"
+    round.status === "open"
   ) {
-
     statusText =
       "Choose your team";
-
   } else if (
-    round.status ===
-    "locked"
+    round.status === "locked"
   ) {
-
     statusText =
       "Selections locked";
-
   } else if (
-    round.status ===
-    "in_progress"
+    round.status === "in_progress"
   ) {
-
     statusText =
       "Round in progress";
-
   } else if (
-    round.status ===
-    "completed"
+    round.status === "completed"
   ) {
-
     statusText =
       "Round completed";
   }
@@ -644,7 +276,6 @@ function renderDashboard() {
     );
 
   if (badge) {
-
     const status =
       String(
         player.status ||
@@ -671,7 +302,6 @@ function renderDashboard() {
   if (
     stats.length >= 3
   ) {
-
     stats[0].textContent =
       (
         d.used_teams ||
@@ -693,13 +323,12 @@ function renderDashboard() {
     null;
 
   /*
-    Do not overwrite a team the player has
-    selected locally but not yet confirmed.
+    Important:
+    If the player has picked a new team but hasn't
+    confirmed it yet, don't let the background refresh
+    overwrite that choice.
   */
-  if (
-    !state.pendingSelection
-  ) {
-
+  if (!state.pendingSelection) {
     state.selectionTeamId =
       d.selection?.team_id ||
       null;
@@ -712,7 +341,6 @@ function renderDashboard() {
     state.pendingSelection &&
     state.selectionTeamId
   ) {
-
     const pendingFixture =
       (
         d.fixtures ||
@@ -753,7 +381,6 @@ function renderDashboard() {
       !selectedTeamName &&
       state.selectionTeamId
     ) {
-
       const selectedFixture =
         (
           d.fixtures ||
@@ -806,7 +433,6 @@ function renderDashboard() {
     $("selectionHint");
 
   if (hint) {
-
     hint.textContent =
       selectedTeamName
         ? `Your current selection is ${selectedTeamName}. You can change it until the deadline.`
@@ -816,19 +442,12 @@ function renderDashboard() {
   updateCountdown();
 }
 
-
-/* =====================================================
-   FIXTURES
-   ===================================================== */
-
 function renderFixtures() {
-
   const el =
     $("fixtures");
 
   const fixtures =
-    state.data?.fixtures ||
-    [];
+    state.data?.fixtures || [];
 
   const used =
     getUsedTeams();
@@ -839,7 +458,6 @@ function renderFixtures() {
   if (
     !fixtures.length
   ) {
-
     el.innerHTML =
       `
         <div class="empty-state">
@@ -922,34 +540,29 @@ function renderFixtures() {
             if (selected) {
               label =
                 "SELECTED";
-
             } else if (
               usedAlready
             ) {
-
               label =
                 "USED";
-
             } else if (
               unavailable
             ) {
-
               label =
                 String(
                   fixtureStatus
                 ).toUpperCase();
-
             } else if (
               !open
             ) {
-
               label =
                 "LOCKED";
             }
 
             const usedStyle =
               usedAlready
-                ? `
+                ?
+                `
                   style="
                     background:#3a3f48;
                     border-color:#555b65;
@@ -958,7 +571,8 @@ function renderFixtures() {
                     cursor:not-allowed;
                   "
                 `
-                : "";
+                :
+                "";
 
             return `
               <button
@@ -989,7 +603,9 @@ function renderFixtures() {
 
               <div
                 class="fixture-main"
-                style="width:100%;"
+                style="
+                  width:100%;
+                "
               >
 
                 <div
@@ -1110,11 +726,6 @@ function renderFixtures() {
     !open;
 }
 
-
-/* =====================================================
-   SAVE SELECTION
-   ===================================================== */
-
 async function saveSelection() {
 
   if (
@@ -1172,6 +783,11 @@ async function saveSelection() {
       );
     }
 
+    /*
+      The selection has now been saved to Supabase.
+      Clear the pending flag so future refreshes use
+      the saved selection.
+    */
     state.pendingSelection =
       false;
 
@@ -1205,11 +821,17 @@ async function saveSelection() {
   }
 }
 
+/*
+  LOAD PLAYER
 
-/* =====================================================
-   LOAD PLAYER
-   ===================================================== */
+  This version is designed to prevent the problem where
+  the app suddenly changes to "Failed to fetch".
 
+  It tries the connection up to 3 times.
+
+  If the app has already loaded successfully, a temporary
+  connection failure will NOT replace the working screen.
+*/
 async function loadPlayer(
   silent = false
 ) {
@@ -1232,8 +854,8 @@ async function loadPlayer(
       null;
 
     /*
-      Try up to three times in case of
-      a temporary mobile connection problem.
+      Retry temporary mobile/Supabase
+      connection drops.
     */
     for (
       let attempt = 0;
@@ -1298,6 +920,9 @@ async function loadPlayer(
       );
     }
 
+    /*
+      Successful connection.
+    */
     state.data =
       data;
 
@@ -1320,8 +945,13 @@ async function loadPlayer(
       error;
 
     /*
-      If the game has already loaded,
-      NEVER replace it with an error screen.
+      IMPORTANT:
+
+      If the app has already loaded once,
+      DO NOT replace the working screen.
+
+      The automatic 30-second refresh will
+      try again.
     */
     if (
       state.hasLoadedOnce &&
@@ -1331,6 +961,10 @@ async function loadPlayer(
       return;
     }
 
+    /*
+      Only show the full connection error
+      if the very first load failed.
+    */
     $("playerName")
       .textContent =
       "Connection error";
@@ -1376,251 +1010,6 @@ async function loadPlayer(
   }
 }
 
-
-/* =====================================================
-   MANUAL REFRESH
-   ===================================================== */
-
-async function manualRefresh() {
-
-  if (
-    state.refreshing
-  ) {
-    return;
-  }
-
-  state.refreshing =
-    true;
-
-  showRefreshIndicator();
-
-  try {
-
-    await loadPlayer(true);
-
-  } finally {
-
-    setTimeout(
-      () => {
-
-        hideRefreshIndicator();
-
-        state.refreshing =
-          false;
-
-      },
-      350
-    );
-  }
-}
-
-
-/*
-  Detect a pull-down gesture at the very top of
-  the page.
-
-  The browser's normal pull-to-refresh is prevented
-  and replaced with our own smoother refresh.
-*/
-function setupPullToRefresh() {
-
-  let startY =
-    0;
-
-  let startX =
-    0;
-
-  let pulling =
-    false;
-
-  document.addEventListener(
-    "touchstart",
-    (event) => {
-
-      if (
-        event.touches.length !== 1
-      ) {
-        return;
-      }
-
-      startY =
-        event.touches[0].clientY;
-
-      startX =
-        event.touches[0].clientX;
-
-      pulling =
-        window.scrollY <= 2;
-
-    },
-    {
-      passive: true
-    }
-  );
-
-  document.addEventListener(
-    "touchmove",
-    (event) => {
-
-      if (
-        !pulling ||
-        state.refreshing
-      ) {
-        return;
-      }
-
-      if (
-        !event.touches.length
-      ) {
-        return;
-      }
-
-      const currentY =
-        event.touches[0].clientY;
-
-      const currentX =
-        event.touches[0].clientX;
-
-      const deltaY =
-        currentY - startY;
-
-      const deltaX =
-        Math.abs(
-          currentX - startX
-        );
-
-      /*
-        Only treat a mostly vertical downward
-        gesture as pull-to-refresh.
-      */
-      if (
-        deltaY > 18 &&
-        deltaY > deltaX
-      ) {
-
-        /*
-          Stop Chrome's native pull-to-refresh.
-        */
-        event.preventDefault();
-
-        setupRefreshStyle();
-
-        const indicator =
-          $("refreshIndicator");
-
-        if (indicator) {
-
-          const progress =
-            Math.min(
-              1,
-              deltaY / 90
-            );
-
-          indicator.style.top =
-            `${-54 + (
-              66 * progress
-            )}px`;
-
-          indicator.style.opacity =
-            String(
-              progress
-            );
-
-          if (
-            progress >= 1
-          ) {
-
-            indicator.classList.add(
-              "show"
-            );
-          }
-        }
-      }
-
-    },
-    {
-      passive: false
-    }
-  );
-
-  document.addEventListener(
-    "touchend",
-    async (event) => {
-
-      if (!pulling) {
-        return;
-      }
-
-      const endY =
-        event.changedTouches?.[0]
-          ?.clientY ??
-        startY;
-
-      const deltaY =
-        endY - startY;
-
-      pulling =
-        false;
-
-      if (
-        deltaY >= 65 &&
-        window.scrollY <= 2 &&
-        !state.refreshing
-      ) {
-
-        await manualRefresh();
-
-      } else {
-
-        const indicator =
-          $("refreshIndicator");
-
-        if (indicator) {
-
-          indicator.style.top =
-            "-54px";
-
-          indicator.style.opacity =
-            "0";
-        }
-      }
-
-    },
-    {
-      passive: true
-    }
-  );
-
-  document.addEventListener(
-    "touchcancel",
-    () => {
-
-      pulling =
-        false;
-
-      const indicator =
-        $("refreshIndicator");
-
-      if (indicator) {
-
-        indicator.style.top =
-          "-54px";
-
-        indicator.style.opacity =
-          "0";
-      }
-    },
-    {
-      passive: true
-    }
-  );
-}
-
-
-/* =====================================================
-   COUNTDOWN
-   ===================================================== */
-
 function updateCountdown() {
 
   const el =
@@ -1630,9 +1019,7 @@ function updateCountdown() {
     return;
   }
 
-  if (
-    !state.deadline
-  ) {
+  if (!state.deadline) {
 
     el.textContent =
       "--:--:--";
@@ -1785,7 +1172,9 @@ function ensureHistoryView() {
       "main"
     );
 
-  if (main) {
+  if (
+    main
+  ) {
     main.appendChild(
       historyView
     );
@@ -1853,21 +1242,18 @@ function resultStyle(result) {
     value === "win" ||
     value === "through"
   ) {
-
     return "color:#86efac;";
   }
 
   if (
     value === "loss"
   ) {
-
     return "color:#fca5a5;";
   }
 
   if (
     value === "draw"
   ) {
-
     return "color:#fcd34a;";
   }
 
@@ -2127,9 +1513,7 @@ async function loadHistory() {
    NAVIGATION
    ===================================================== */
 
-function setMainView(
-  view
-) {
+function setMainView(view) {
 
   const main =
     document.querySelector(
@@ -2167,7 +1551,8 @@ function setMainView(
           "";
 
       } else if (
-        view === "rules" &&
+        view ===
+        "rules" &&
         child.classList.contains(
           "rules-card"
         )
@@ -2262,10 +1647,6 @@ function setupNavigation() {
 
 function startApp() {
 
-  setupRefreshStyle();
-
-  setupPullToRefresh();
-
   const confirmBtn =
     $("confirmBtn");
 
@@ -2289,13 +1670,13 @@ function startApp() {
   );
 
   /*
-    Automatic background refresh.
-    The existing screen remains visible if
-    the connection temporarily fails.
+    Background refresh every 30 seconds.
+
+    If Supabase temporarily fails, the new loadPlayer()
+    keeps the existing working dashboard on screen.
   */
   setInterval(
-    () =>
-      loadPlayer(true),
+    () => loadPlayer(true),
     30000
   );
 }
