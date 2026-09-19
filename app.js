@@ -212,13 +212,13 @@ function getUsedTeams() {
         );
 
         return;
+
       }
 
 
       const id =
         team.team_id ||
         team.id;
-
 
       const name =
         team.team_name ||
@@ -366,10 +366,8 @@ function renderDashboard() {
   const player =
     d.player || {};
 
-
   const competition =
     d.competition || {};
-
 
   const round =
     d.current_round || {};
@@ -1052,6 +1050,9 @@ async function saveSelection() {
       await callRpc(
         "make_selection",
         {
+          p_player_code:
+            PLAYER_CODE,
+
           p_round_id:
             round.id,
 
@@ -1104,7 +1105,8 @@ async function saveSelection() {
 
     $("selectionHint")
       .textContent =
-      "Selection could not be saved yet. The database connection is working, but the player selection function needs to be connected.";
+      error?.message ||
+      "Selection could not be saved.";
 
   }
 
@@ -1113,215 +1115,4 @@ async function saveSelection() {
 
 async function loadPlayer() {
 
-  try {
-
-    const raw =
-      await callRpc(
-        "get_lms_player_data",
-        {
-          p_player_code:
-            PLAYER_CODE
-        }
-      );
-
-
-    const data =
-      normaliseDashboard(
-        raw
-      );
-
-
-    if (
-      !data.player?.id
-    ) {
-
-      $("playerName")
-        .textContent =
-        PLAYER_CODE;
-
-
-      $("selectionTitle")
-        .textContent =
-        "Player not found";
-
-
-      $("selectionHint")
-        .textContent =
-        "The GARY player could not be found.";
-
-
-      $("fixtures")
-        .innerHTML =
-        `
-          <div class="empty-state">
-            Player GARY is not registered.
-          </div>
-        `;
-
-
-      $("confirmBtn")
-        .disabled =
-        true;
-
-
-      return;
-
-    }
-
-
-    state.data =
-      data;
-
-
-    renderDashboard();
-
-
-    updateCountdown();
-
-  } catch (error) {
-
-    console.error(
-      error
-    );
-
-
-    $("selectionTitle")
-      .textContent =
-      "Database connection error";
-
-
-    $("selectionHint")
-      .textContent =
-      "The app could not load the competition data.";
-
-
-    $("fixtures")
-      .innerHTML =
-      `
-        <div class="empty-state">
-          Unable to load competition data.
-        </div>
-      `;
-
-
-    $("confirmBtn")
-      .disabled =
-      true;
-
-  }
-
-}
-
-
-function updateCountdown() {
-
-  const el =
-    $("countdown");
-
-
-  if (!state.deadline) {
-
-    el.textContent =
-      "--:--:--";
-
-    return;
-
-  }
-
-
-  const diff =
-    new Date(
-      state.deadline
-    ).getTime() -
-    Date.now();
-
-
-  if (
-    diff <= 0
-  ) {
-
-    el.textContent =
-      "LOCKED";
-
-
-    $("lockPill")
-      .textContent =
-      "LOCKED";
-
-
-    $("confirmBtn")
-      .disabled =
-      true;
-
-
-    document
-      .querySelectorAll(
-        ".pick-btn"
-      )
-      .forEach(
-        (button) => {
-          button.disabled =
-            true;
-        }
-      );
-
-
-    return;
-
-  }
-
-
-  const hours =
-    Math.floor(
-      diff /
-      3600000
-    );
-
-
-  const minutes =
-    Math.floor(
-      diff /
-      60000
-    ) % 60;
-
-
-  const seconds =
-    Math.floor(
-      diff /
-      1000
-    ) % 60;
-
-
-  el.textContent =
-    [
-      hours,
-      minutes,
-      seconds
-    ]
-      .map(
-        (value) =>
-          String(value)
-            .padStart(
-              2,
-              "0"
-            )
-      )
-      .join(":");
-
-}
-
-
-$("confirmBtn")
-  .addEventListener(
-    "click",
-    saveSelection
-  );
-
-
-loadPlayer();
-
-
-setInterval(
-  updateCountdown,
-  1000
-);
+  try
