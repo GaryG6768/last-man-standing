@@ -11,17 +11,21 @@ const state = {
 const $ = (id) => document.getElementById(id);
 
 async function callRpc(name, body) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/rpc/${name}`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    }
+  );
 
   const text = await response.text();
+
   let data = null;
 
   try {
@@ -32,7 +36,10 @@ async function callRpc(name, body) {
 
   if (!response.ok) {
     throw new Error(
-      (data && (data.message || data.error || data.hint)) ||
+      (data &&
+        (data.message ||
+          data.error ||
+          data.hint)) ||
       `Supabase RPC error ${response.status}`
     );
   }
@@ -41,12 +48,17 @@ async function callRpc(name, body) {
 }
 
 function first(value) {
-  return Array.isArray(value) ? value[0] : value;
+  return Array.isArray(value)
+    ? value[0]
+    : value;
 }
 
 function money(value) {
   const n = Number(value);
-  return Number.isFinite(n) ? `£${n}` : "£5";
+
+  return Number.isFinite(n)
+    ? `£${n}`
+    : "£5";
 }
 
 function formatDate(value) {
@@ -54,36 +66,174 @@ function formatDate(value) {
 
   const d = new Date(value);
 
-  if (Number.isNaN(d.getTime())) return "";
+  if (Number.isNaN(d.getTime())) {
+    return "";
+  }
 
-  return d.toLocaleString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  return d.toLocaleString(
+    "en-GB",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
+    }
+  );
 }
 
 function normaliseDashboard(raw) {
   const data = first(raw) || {};
 
   return {
-    success: data.success !== false,
-    player: data.player || {},
-    competition: data.competition || {},
-    current_round: data.current_round || data.round || {},
-    selection: data.selection || null,
-    used_teams: data.used_teams || [],
-    fixtures: data.fixtures || []
+    success:
+      data.success !== false,
+
+    player:
+      data.player || {},
+
+    competition:
+      data.competition || {},
+
+    current_round:
+      data.current_round ||
+      data.round ||
+      {},
+
+    selection:
+      data.selection || null,
+
+    used_teams:
+      data.used_teams || [],
+
+    fixtures:
+      data.fixtures || []
   };
 }
 
-function usedTeamIds() {
-  return new Set(
-    (state.data?.used_teams || []).map(
-      t => t.team_id || t.id
+/*
+  Used teams can come back from Supabase
+  in different formats.
+
+  This function supports:
+
+  { team_id: "...", team_name: "Arsenal" }
+
+  or
+
+  { id: "...", name: "Arsenal" }
+
+  or simply:
+
+  "Arsenal"
+*/
+
+function getUsedTeams() {
+  const ids = new Set();
+  const names = new Set();
+
+  const used =
+    state.data?.used_teams || [];
+
+  used.forEach((team) => {
+    if (!team) return;
+
+    if (typeof team === "string") {
+      names.add(
+        team.trim().toLowerCase()
+      );
+      return;
+    }
+
+    const id =
+      team.team_id ||
+      team.id;
+
+    const name =
+      team.team_name ||
+      team.name ||
+      team.short_name;
+
+    if (id) {
+      ids.add(String(id));
+    }
+
+    if (name) {
+      names.add(
+        String(name)
+          .trim()
+          .toLowerCase()
+      );
+    }
+  });
+
+  return {
+    ids,
+    names
+  };
+}
+
+function isTeamUsed(
+  teamId,
+  teamName,
+  used
+) {
+  if (
+    teamId &&
+    used.ids.has(String(teamId))
+  ) {
+    return true;
+  }
+
+  if (
+    teamName &&
+    used.names.has(
+      String(teamName)
+        .trim()
+        .toLowerCase()
     )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function getFixtureHomeId(fixture) {
+  return (
+    fixture.home_team_id ||
+    fixture.home_id ||
+    fixture.homeTeamId ||
+    null
+  );
+}
+
+function getFixtureAwayId(fixture) {
+  return (
+    fixture.away_team_id ||
+    fixture.away_id ||
+    fixture.awayTeamId ||
+    null
+  );
+}
+
+function getFixtureHomeName(fixture) {
+  return (
+    fixture.home_name ||
+    fixture.home_team ||
+    fixture.home ||
+    fixture.homeTeam ||
+    "Home"
+  );
+}
+
+function getFixtureAwayName(fixture) {
+  return (
+    fixture.away_name ||
+    fixture.away_team ||
+    fixture.away ||
+    fixture.awayTeam ||
+    "Away"
   );
 }
 
@@ -92,12 +242,18 @@ function renderDashboard() {
 
   if (!d) return;
 
-  const player = d.player || {};
-  const competition = d.competition || {};
-  const round = d.current_round || {};
+  const player =
+    d.player || {};
+
+  const competition =
+    d.competition || {};
+
+  const round =
+    d.current_round || {};
 
   $("playerName").textContent =
-    player.name || PLAYER_CODE;
+    player.name ||
+    PLAYER_CODE;
 
   $("roundNumber").textContent =
     round.round_number
@@ -116,24 +272,34 @@ function renderDashboard() {
       : "Waiting to start";
 
   const heroStatus =
-    document.querySelector(".hero-status");
+    document.querySelector(
+      ".hero-status"
+    );
 
   if (heroStatus) {
-    heroStatus.textContent = statusText;
+    heroStatus.textContent =
+      statusText;
   }
 
   const badge =
-    document.querySelector(".badge");
+    document.querySelector(
+      ".badge"
+    );
 
   if (badge) {
     const s =
-      String(player.status || "alive").toUpperCase();
+      String(
+        player.status ||
+          "alive"
+      ).toUpperCase();
 
     badge.textContent = s;
 
     badge.className =
       "badge " +
-      (s === "ALIVE" ? "alive" : "");
+      (s === "ALIVE"
+        ? "alive"
+        : "");
   }
 
   const stats =
@@ -143,31 +309,99 @@ function renderDashboard() {
 
   if (stats.length >= 3) {
     stats[0].textContent =
-      (d.used_teams || []).length;
+      (
+        d.used_teams || []
+      ).length;
 
     stats[1].textContent =
-      player.missed_selection_count ?? 0;
+      player.missed_selection_count ??
+      0;
 
     stats[2].textContent =
-      money(competition.entry_fee);
+      money(
+        competition.entry_fee
+      );
   }
 
   state.deadline =
-    round.selection_deadline || null;
+    round.selection_deadline ||
+    null;
 
   state.selectionTeamId =
-    d.selection?.team_id || null;
+    d.selection?.team_id ||
+    null;
+
+  /*
+    Work out the selected team's
+    name from the fixtures.
+  */
+
+  let selectedTeamName =
+    d.selection?.team_name ||
+    null;
+
+  if (
+    !selectedTeamName &&
+    state.selectionTeamId
+  ) {
+    const selectedFixture =
+      (
+        d.fixtures || []
+      ).find((fixture) => {
+        return (
+          String(
+            getFixtureHomeId(
+              fixture
+            )
+          ) ===
+            String(
+              state.selectionTeamId
+            ) ||
+          String(
+            getFixtureAwayId(
+              fixture
+            )
+          ) ===
+            String(
+              state.selectionTeamId
+            )
+        );
+      });
+
+    if (selectedFixture) {
+      if (
+        String(
+          getFixtureHomeId(
+            selectedFixture
+          )
+        ) ===
+        String(
+          state.selectionTeamId
+        )
+      ) {
+        selectedTeamName =
+          getFixtureHomeName(
+            selectedFixture
+          );
+      } else {
+        selectedTeamName =
+          getFixtureAwayName(
+            selectedFixture
+          );
+      }
+    }
+  }
 
   $("selectionTitle").textContent =
-    d.selection?.team_name
-      ? d.selection.team_name
-      : "Choose your team";
+    selectedTeamName ||
+    "Choose your team";
 
   $("lockPill").textContent =
     round.status === "open"
       ? "OPEN"
       : String(
-          round.status || "WAITING"
+          round.status ||
+            "WAITING"
         ).toUpperCase();
 
   renderFixtures();
@@ -176,398 +410,5 @@ function renderDashboard() {
     $("selectionHint");
 
   if (hint) {
-    if (d.selection?.team_name) {
-      hint.textContent =
-        `Your current selection is ${d.selection.team_name}. You can change it until the deadline.`;
-    } else {
-      hint.textContent =
-        "Choose one Premier League team to win its game.";
-    }
-  }
-}
-
-function renderFixtures() {
-  const el = $("fixtures");
-
-  const fixtures =
-    state.data?.fixtures || [];
-
-  const used =
-    usedTeamIds();
-
-  if (!fixtures.length) {
-    el.innerHTML =
-      '<div class="empty-state">No fixtures are available for the current round yet.</div>';
-
-    $("confirmBtn").disabled = true;
-
-    return;
-  }
-
-  el.innerHTML =
-    fixtures.map((f) => {
-
-      const homeId =
-        f.home_team_id ||
-        f.home_id;
-
-      const awayId =
-        f.away_team_id ||
-        f.away_id;
-
-      const home =
-        f.home ||
-        f.home_name ||
-        "Home";
-
-      const away =
-        f.away ||
-        f.away_name ||
-        "Away";
-
-      const kickoff =
-        formatDate(
-          f.kickoff_time
-        );
-
-      const fixtureStatus =
-        f.status || "scheduled";
-
-      const teamButton =
-        (id, name) => {
-
-          const usedAlready =
-            used.has(id) &&
-            id !== state.selectionTeamId;
-
-          const selected =
-            state.selectionTeamId === id;
-
-          const disabled =
-            usedAlready ||
-            fixtureStatus !== "scheduled";
-
-          return `
-            <button
-              class="pick-btn ${selected ? "selected" : ""}"
-              data-team-id="${id || ""}"
-              ${disabled ? "disabled" : ""}
-            >
-              ${
-                selected
-                  ? "SELECTED"
-                  : usedAlready
-                  ? "USED"
-                  : "PICK"
-              } ${name}
-            </button>
-          `;
-        };
-
-      return `
-        <div class="fixture">
-
-          <div class="fixture-main">
-
-            <div class="fixture-teams">
-              ${home} v ${away}
-            </div>
-
-            <div class="fixture-time">
-              ${kickoff}
-            </div>
-
-          </div>
-
-          <div
-            style="
-              display:flex;
-              gap:8px;
-              flex-wrap:wrap;
-              margin-top:10px
-            "
-          >
-
-            ${teamButton(homeId, home)}
-
-            ${teamButton(awayId, away)}
-
-          </div>
-
-        </div>
-      `;
-
-    }).join("");
-
-  document
-    .querySelectorAll(
-      ".pick-btn[data-team-id]"
-    )
-    .forEach(btn => {
-
-      btn.addEventListener(
-        "click",
-        () => {
-
-          state.selectionTeamId =
-            btn.dataset.teamId;
-
-          const selectedFixture =
-            fixtures.find(f =>
-              String(
-                f.home_team_id ||
-                f.home_id
-              ) ===
-                String(
-                  state.selectionTeamId
-                ) ||
-
-              String(
-                f.away_team_id ||
-                f.away_id
-              ) ===
-                String(
-                  state.selectionTeamId
-                )
-            );
-
-          const teamName =
-            selectedFixture &&
-
-            (
-              String(
-                selectedFixture.home_team_id ||
-                selectedFixture.home_id
-              ) ===
-                String(
-                  state.selectionTeamId
-                )
-
-                ?
-
-              selectedFixture.home ||
-              selectedFixture.home_name
-
-                :
-
-              selectedFixture.away ||
-              selectedFixture.away_name
-            );
-
-          $("selectionTitle").textContent =
-            teamName ||
-            "Team selected";
-
-          $("confirmBtn").disabled =
-            false;
-
-          renderFixtures();
-
-        }
-      );
-
-    });
-
-  $("confirmBtn").disabled =
-    !state.selectionTeamId;
-}
-
-async function saveSelection() {
-
-  if (!state.selectionTeamId) {
-    return;
-  }
-
-  const round =
-    state.data?.current_round;
-
-  if (!round?.id) {
-
-    alert(
-      "There is no open round yet."
-    );
-
-    return;
-  }
-
-  const btn =
-    $("confirmBtn");
-
-  btn.disabled = true;
-  btn.textContent = "Saving...";
-
-  try {
-
-    const result =
-      await callRpc(
-        "make_selection",
-        {
-          p_round_id: round.id,
-          p_team_id:
-            state.selectionTeamId
-        }
-      );
-
-    if (result?.success === false) {
-      throw new Error(
-        result.message ||
-        "Selection was not saved."
-      );
-    }
-
-    $("selectionHint").textContent =
-      result?.message ||
-      "Selection saved successfully.";
-
-    btn.textContent =
-      "Selection saved";
-
-    await loadPlayer();
-
-  } catch (error) {
-
-    console.error(error);
-
-    btn.disabled = false;
-
-    btn.textContent =
-      "Confirm selection";
-
-    $("selectionHint").textContent =
-      "The database connection is working, but player selection security still needs to be connected. No selection was changed.";
-  }
-}
-
-async function loadPlayer() {
-
-  try {
-
-    const raw =
-      await callRpc(
-        "get_lms_player_data",
-        {
-          p_player_code:
-            PLAYER_CODE
-        }
-      );
-
-    const data =
-      normaliseDashboard(raw);
-
-    if (!data.player?.id) {
-
-      $("playerName").textContent =
-        PLAYER_CODE;
-
-      $("selectionTitle").textContent =
-        "Player not registered";
-
-      $("selectionHint").textContent =
-        `The app connected to Supabase successfully, but player code ${PLAYER_CODE} is not registered yet.`;
-
-      $("fixtures").innerHTML =
-        '<div class="empty-state">Add the GARY test player in the Supabase admin area, then refresh this page.</div>';
-
-      $("confirmBtn").disabled =
-        true;
-
-      return;
-    }
-
-    state.data =
-      data;
-
-    renderDashboard();
-
-  } catch (error) {
-
-    console.error(error);
-
-    $("selectionTitle").textContent =
-      "Database connection error";
-
-    $("selectionHint").textContent =
-      "The app could not load the Last Man Standing player data. Check the Supabase RPC and player code.";
-
-    $("fixtures").innerHTML =
-      '<div class="empty-state">Unable to load competition data.</div>';
-
-    $("confirmBtn").disabled =
-      true;
-  }
-}
-
-function updateCountdown() {
-
-  const el =
-    $("countdown");
-
-  if (!state.deadline) {
-
-    el.textContent =
-      "--:--:--";
-
-    return;
-  }
-
-  const diff =
-    new Date(
-      state.deadline
-    ).getTime() -
-    Date.now();
-
-  if (diff <= 0) {
-
-    el.textContent =
-      "LOCKED";
-
-    $("lockPill").textContent =
-      "LOCKED";
-
-    $("confirmBtn").disabled =
-      true;
-
-    return;
-  }
-
-  const h =
-    Math.floor(
-      diff / 3600000
-    );
-
-  const m =
-    Math.floor(
-      diff / 60000
-    ) % 60;
-
-  const s =
-    Math.floor(
-      diff / 1000
-    ) % 60;
-
-  el.textContent =
-    [
-      h,
-      m,
-      s
-    ]
-      .map(
-        v =>
-          String(v)
-            .padStart(2, "0")
-      )
-      .join(":");
-}
-
-$("confirmBtn")
-  .addEventListener(
-    "click",
-    saveSelection
-  );
-
-loadPlayer();
-
-setInterval(
-  updateCountdown,
-  1000
-);
+    if (selectedTeamName) {
+     
