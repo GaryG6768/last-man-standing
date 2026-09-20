@@ -304,17 +304,15 @@
       }
 
 
-      await window.lmsSwitchPlayer(
-        code
-      );
+      window.lmsSwitchPlayer(
+  code
+);
 
+saveCode(
+  code
+);
 
-      saveCode(
-        code
-      );
-
-
-      hideLogin();
+hideLogin();
 
 
       setTimeout(
