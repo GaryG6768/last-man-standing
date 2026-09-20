@@ -9,83 +9,187 @@
 
   const CODE_KEY = "lms_player_code";
 
+  let supabaseClient = null;
+
+
+  /* =====================================================
+     LOCAL PLAYER CODE
+     ===================================================== */
+
   function getSavedCode() {
-    return localStorage.getItem(CODE_KEY) || "";
+    return (
+      localStorage.getItem(CODE_KEY) || ""
+    )
+      .trim()
+      .toUpperCase();
   }
 
   function saveCode(code) {
-    localStorage.setItem(CODE_KEY, code);
+    localStorage.setItem(
+      CODE_KEY,
+      String(code)
+        .trim()
+        .toUpperCase()
+    );
   }
 
   function clearCode() {
     localStorage.removeItem(CODE_KEY);
   }
 
+
+  /* =====================================================
+     LOGIN SCREEN
+     ===================================================== */
+
   function showLogin() {
-    const overlay = document.getElementById("lms-login-overlay");
+
+    const overlay =
+      document.getElementById(
+        "lms-login-overlay"
+      );
 
     if (overlay) {
       overlay.style.display = "flex";
     }
   }
 
+
   function hideLogin() {
-    const overlay = document.getElementById("lms-login-overlay");
+
+    const overlay =
+      document.getElementById(
+        "lms-login-overlay"
+      );
 
     if (overlay) {
       overlay.style.display = "none";
     }
   }
 
-  function createLoginScreen() {
-    if (document.getElementById("lms-login-overlay")) {
+
+  function setLoginMessage(
+    message,
+    isError = false
+  ) {
+
+    const el =
+      document.getElementById(
+        "lms-login-error"
+      );
+
+    if (!el) {
       return;
     }
 
-    const overlay = document.createElement("div");
+    el.textContent =
+      message || "";
 
-    overlay.id = "lms-login-overlay";
+    el.style.color =
+      isError
+        ? "#dc2626"
+        : "#374151";
+  }
 
-    overlay.style.cssText = `
-      position: fixed;
-      inset: 0;
-      z-index: 999999;
-      background: #f4f7fb;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      box-sizing: border-box;
-    `;
+
+  function createLoginScreen() {
+
+    if (
+      document.getElementById(
+        "lms-login-overlay"
+      )
+    ) {
+      return;
+    }
+
+    const overlay =
+      document.createElement(
+        "div"
+      );
+
+    overlay.id =
+      "lms-login-overlay";
+
+    overlay.style.cssText =
+      `
+      position:fixed;
+      inset:0;
+      z-index:999999;
+      background:#f4f7fb;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      box-sizing:border-box;
+      `;
 
     overlay.innerHTML = `
-      <div style="
-        width:100%;
-        max-width:420px;
-        background:white;
-        border-radius:20px;
-        padding:30px 24px;
-        box-sizing:border-box;
-        box-shadow:0 10px 35px rgba(0,0,0,.15);
-        text-align:center;
-      ">
 
-        <div style="
-          font-size:32px;
-          font-weight:800;
-          margin-bottom:8px;
-          color:#111827;
-        ">
+      <div
+        style="
+          width:100%;
+          max-width:420px;
+          background:white;
+          border-radius:20px;
+          padding:30px 24px;
+          box-sizing:border-box;
+          box-shadow:0 10px 35px rgba(0,0,0,.15);
+          text-align:center;
+        "
+      >
+
+        <div
+          style="
+            font-size:30px;
+            font-weight:800;
+            margin-bottom:8px;
+            color:#111827;
+          "
+        >
           LAST MAN STANDING
         </div>
 
-        <div style="
-          font-size:16px;
-          color:#6b7280;
-          margin-bottom:28px;
-        ">
-          Enter your player code to enter the game
+
+        <div
+          style="
+            font-size:16px;
+            color:#6b7280;
+            margin-bottom:22px;
+          "
+        >
+          Secure player login
         </div>
+
+
+        <button
+          id="lms-passkey-button"
+          style="
+            width:100%;
+            padding:16px;
+            border:0;
+            border-radius:12px;
+            background:#111827;
+            color:white;
+            font-size:17px;
+            font-weight:800;
+            cursor:pointer;
+          "
+        >
+          USE FACE ID / FINGERPRINT
+        </button>
+
+
+        <div
+          style="
+            margin:18px 0;
+            color:#9ca3af;
+            font-size:13px;
+            font-weight:700;
+          "
+        >
+          FIRST-TIME SETUP
+        </div>
+
 
         <input
           id="lms-login-code"
@@ -110,11 +214,12 @@
           "
         />
 
+
         <button
           id="lms-login-button"
           style="
             width:100%;
-            margin-top:16px;
+            margin-top:12px;
             padding:16px;
             border:0;
             border-radius:12px;
@@ -125,8 +230,9 @@
             cursor:pointer;
           "
         >
-          ENTER THE GAME
+          SET UP SECURE LOGIN
         </button>
+
 
         <div
           id="lms-login-error"
@@ -142,133 +248,559 @@
       </div>
     `;
 
-    document.body.appendChild(overlay);
-
-    const input = document.getElementById("lms-login-code");
-    const button = document.getElementById("lms-login-button");
-
-    button.addEventListener("click", login);
-
-    input.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") {
-        login();
-      }
-    });
-  }
-
-  async function checkCode(code) {
-    const response = await fetch(
-      SUPABASE_URL + "/rest/v1/rpc/get_lms_player_data",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          Authorization: "Bearer " + SUPABASE_KEY
-        },
-        body: JSON.stringify({
-          p_player_code: code
-        })
-      }
+    document.body.appendChild(
+      overlay
     );
 
-    if (!response.ok) {
-      throw new Error("Unable to check player code.");
-    }
 
-    const data = await response.json();
+    document
+      .getElementById(
+        "lms-login-button"
+      )
+      .addEventListener(
+        "click",
+        firstTimeSetup
+      );
 
-    if (!data || data.success !== true || !data.player) {
-      return false;
-    }
 
-    return true;
+    document
+      .getElementById(
+        "lms-passkey-button"
+      )
+      .addEventListener(
+        "click",
+        signInWithPasskey
+      );
+
+
+    document
+      .getElementById(
+        "lms-login-code"
+      )
+      .addEventListener(
+        "keydown",
+        function (event) {
+
+          if (
+            event.key === "Enter"
+          ) {
+            firstTimeSetup();
+          }
+
+        }
+      );
   }
 
-  async function login() {
-    const input = document.getElementById("lms-login-code");
-    const button = document.getElementById("lms-login-button");
-    const error = document.getElementById("lms-login-error");
 
-    if (!input) {
+  /* =====================================================
+     SUPABASE RPC
+     ===================================================== */
+
+  async function callRpc(
+    name,
+    body
+  ) {
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.rpc(
+        name,
+        body || {}
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
+
+
+  /* =====================================================
+     GET CURRENT PLAYER
+     ===================================================== */
+
+  async function getIdentity() {
+
+    const result =
+      await callRpc(
+        "get_lms_my_identity"
+      );
+
+    if (
+      !result ||
+      result.success !== true
+    ) {
+      return null;
+    }
+
+    return result;
+  }
+
+
+  /* =====================================================
+     FIRST LOGIN — AUTH BRIDGE
+     ===================================================== */
+
+  async function establishBridgeSession(
+    code
+  ) {
+
+    const response =
+      await fetch(
+        SUPABASE_URL +
+        "/functions/v1/lms-auth-bridge",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            apikey:
+              SUPABASE_KEY
+          },
+
+          body: JSON.stringify({
+            player_code: code
+          })
+        }
+      );
+
+
+    const data =
+      await response
+        .json()
+        .catch(
+          () => ({})
+        );
+
+
+    if (
+      !response.ok ||
+      !data.success
+    ) {
+
+      const error =
+        new Error(
+          data.message ||
+          "Secure login setup failed."
+        );
+
+      error.code =
+        data.code || "";
+
+      throw error;
+    }
+
+
+    const {
+      error
+    } =
+      await supabaseClient.auth.setSession(
+        {
+          access_token:
+            data.access_token,
+
+          refresh_token:
+            data.refresh_token
+        }
+      );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    return data;
+  }
+
+
+  /* =====================================================
+     REGISTER PASSKEY
+     ===================================================== */
+
+  async function registerPasskey() {
+
+    if (
+      !supabaseClient?.auth
+        ?.registerPasskey
+    ) {
+
+      throw new Error(
+        "Passkey support is not available in this browser."
+      );
+    }
+
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.auth
+        .registerPasskey();
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    return data;
+  }
+
+
+  /* =====================================================
+     FIRST-TIME SECURE SETUP
+     ===================================================== */
+
+  async function firstTimeSetup() {
+
+    const input =
+      document.getElementById(
+        "lms-login-code"
+      );
+
+    const button =
+      document.getElementById(
+        "lms-login-button"
+      );
+
+
+    const code =
+      (
+        input?.value || ""
+      )
+        .trim()
+        .toUpperCase();
+
+
+    if (
+      !/^LMS\d{3}$/.test(
+        code
+      )
+    ) {
+
+      setLoginMessage(
+        "Please enter your player code, for example LMS001.",
+        true
+      );
+
       return;
     }
 
-    const code = input.value.trim().toUpperCase();
 
-    if (!/^LMS\d{3}$/.test(code)) {
-      error.textContent =
-        "Please enter a valid player code, for example LMS001.";
-      return;
-    }
+    button.disabled =
+      true;
 
-    button.disabled = true;
-    button.textContent = "CHECKING...";
-    error.textContent = "";
+    button.textContent =
+      "VERIFYING...";
+
+    setLoginMessage(
+      "Checking your player code..."
+    );
+
 
     try {
-      const valid = await checkCode(code);
 
-      if (!valid) {
+      await establishBridgeSession(
+        code
+      );
+
+
+      button.textContent =
+        "SETTING UP...";
+
+
+      setLoginMessage(
+        "Now create your secure Face ID / fingerprint login."
+      );
+
+
+      await registerPasskey();
+
+
+      const {
+        error
+      } =
+        await supabaseClient.rpc(
+          "mark_lms_passkey_enrolled"
+        );
+
+
+      if (error) {
+        throw error;
+      }
+
+
+      saveCode(code);
+
+
+      button.textContent =
+        "READY";
+
+
+      setLoginMessage(
+        "Secure login created. Opening your game..."
+      );
+
+
+      setTimeout(
+        function () {
+
+          window.location.href =
+            window.location.pathname +
+            "?player=" +
+            encodeURIComponent(
+              code
+            ) +
+            "&refresh=" +
+            Date.now();
+
+        },
+        400
+      );
+
+
+    } catch (err) {
+
+      console.error(
+        "LMS secure setup error:",
+        err
+      );
+
+
+      button.disabled =
+        false;
+
+      button.textContent =
+        "SET UP SECURE LOGIN";
+
+
+      if (
+        err?.code ===
+        "PASSKEY_REQUIRED"
+      ) {
+
+        setLoginMessage(
+          "This player is already secured. Use the Face ID / fingerprint button above.",
+          true
+        );
+
+      } else {
+
+        setLoginMessage(
+          err?.message ||
+          "Secure login setup failed.",
+          true
+        );
+      }
+    }
+  }
+
+
+  /* =====================================================
+     PASSKEY LOGIN
+     ===================================================== */
+
+  async function signInWithPasskey() {
+
+    const button =
+      document.getElementById(
+        "lms-passkey-button"
+      );
+
+
+    if (button) {
+
+      button.disabled =
+        true;
+
+      button.textContent =
+        "VERIFYING...";
+    }
+
+
+    setLoginMessage(
+      "Use Face ID, fingerprint or your device passkey..."
+    );
+
+
+    try {
+
+      const {
+        error
+      } =
+        await supabaseClient.auth
+          .signInWithPasskey();
+
+
+      if (error) {
+        throw error;
+      }
+
+
+      const identity =
+        await getIdentity();
+
+
+      if (!identity) {
+
         throw new Error(
-          "Player code not recognised. Please check your code."
+          "Your passkey is not linked to a Last Man Standing player."
         );
       }
 
-      /*
-       * Save the new player's code.
-       *
-       * We then perform a REAL page navigation.
-       * This completely restarts app.js so there is no
-       * old PLAYER_CODE left in memory.
-       */
-      saveCode(code);
 
-      button.textContent = "ENTERING...";
+      saveCode(
+        identity.player_code
+      );
 
-      const basePath = window.location.pathname;
 
-      window.location.href =
-        basePath +
-        "?player=" +
-        encodeURIComponent(code) +
-        "&refresh=" +
-        Date.now();
+      setLoginMessage(
+        "Login successful. Opening your game..."
+      );
+
+
+      setTimeout(
+        function () {
+
+          window.location.href =
+            window.location.pathname +
+            "?player=" +
+            encodeURIComponent(
+              identity.player_code
+            ) +
+            "&refresh=" +
+            Date.now();
+
+        },
+        300
+      );
+
 
     } catch (err) {
-      console.error("LMS login error:", err);
 
-      button.disabled = false;
-      button.textContent = "ENTER THE GAME";
+      console.error(
+        "LMS passkey sign-in error:",
+        err
+      );
 
-      error.textContent =
-        err && err.message
-          ? err.message
-          : "Unable to enter the game. Please try again.";
+
+      if (button) {
+
+        button.disabled =
+          false;
+
+        button.textContent =
+          "USE FACE ID / FINGERPRINT";
+      }
+
+
+      setLoginMessage(
+        err?.message ||
+        "Passkey login failed. Please try again.",
+        true
+      );
     }
   }
 
-  function addLogoutButton() {
-    if (document.getElementById("lms-change-player")) {
+
+  /* =====================================================
+     RESTORE EXISTING SESSION
+     ===================================================== */
+
+  async function restoreExistingSession() {
+
+    const {
+      data
+    } =
+      await supabaseClient.auth
+        .getSession();
+
+
+    if (
+      !data?.session
+    ) {
+      return null;
+    }
+
+
+    const identity =
+      await getIdentity();
+
+
+    if (!identity) {
+
+      await supabaseClient.auth
+        .signOut({
+          scope: "local"
+        });
+
+      return null;
+    }
+
+
+    saveCode(
+      identity.player_code
+    );
+
+
+    return identity;
+  }
+
+
+  /* =====================================================
+     SECURITY BUTTON
+     ===================================================== */
+
+  function addSecurityButton() {
+
+    if (
+      document.getElementById(
+        "lms-security-button"
+      )
+    ) {
       return;
     }
 
+
     const playerCard =
-      document.querySelector(".player-card") ||
-      document.querySelector(".player-info") ||
-      document.querySelector("#app");
+      document.querySelector(
+        ".player-card"
+      ) ||
+      document.querySelector(
+        ".player-info"
+      ) ||
+      document.querySelector(
+        "#app"
+      );
+
 
     if (!playerCard) {
       return;
     }
 
-    const button = document.createElement("button");
 
-    button.id = "lms-change-player";
+    const button =
+      document.createElement(
+        "button"
+      );
 
-    button.textContent = "CHANGE PLAYER";
 
-    button.style.cssText = `
+    button.id =
+      "lms-security-button";
+
+
+    button.textContent =
+      "SECURITY & LOGIN";
+
+
+    button.style.cssText =
+      `
       display:block;
       width:100%;
       margin-top:12px;
@@ -280,82 +812,623 @@
       font-size:14px;
       font-weight:700;
       cursor:pointer;
+      `;
+
+
+    button.addEventListener(
+      "click",
+      openSecuritySettings
+    );
+
+
+    playerCard.appendChild(
+      button
+    );
+  }
+
+
+  /* =====================================================
+     SECURITY SETTINGS
+     ===================================================== */
+
+  function openSecuritySettings() {
+
+    if (
+      document.getElementById(
+        "lms-security-overlay"
+      )
+    ) {
+      return;
+    }
+
+
+    const currentCode =
+      getSavedCode();
+
+
+    const overlay =
+      document.createElement(
+        "div"
+      );
+
+
+    overlay.id =
+      "lms-security-overlay";
+
+
+    overlay.style.cssText =
+      `
+      position:fixed;
+      inset:0;
+      z-index:999998;
+      background:rgba(15,23,42,.55);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      box-sizing:border-box;
+      `;
+
+
+    overlay.innerHTML = `
+
+      <div
+        style="
+          width:100%;
+          max-width:420px;
+          background:white;
+          border-radius:20px;
+          padding:24px;
+          box-sizing:border-box;
+          box-shadow:0 10px 35px rgba(0,0,0,.25);
+        "
+      >
+
+        <div
+          style="
+            font-size:24px;
+            font-weight:900;
+            color:#111827;
+          "
+        >
+          Security & Login
+        </div>
+
+
+        <div
+          style="
+            margin-top:8px;
+            color:#6b7280;
+            font-size:14px;
+            line-height:1.45;
+          "
+        >
+          Your account is protected by your device passkey.
+          You can change your personal player code after
+          verifying your passkey.
+        </div>
+
+
+        <div
+          style="
+            margin-top:18px;
+            padding:12px;
+            border-radius:12px;
+            background:#f3f4f6;
+            font-weight:800;
+            text-align:center;
+          "
+        >
+          Current code:
+          ${currentCode || "Unknown"}
+        </div>
+
+
+        <button
+          id="lms-verify-security"
+          style="
+            width:100%;
+            margin-top:14px;
+            padding:14px;
+            border:0;
+            border-radius:12px;
+            background:#111827;
+            color:white;
+            font-weight:800;
+          "
+        >
+          VERIFY WITH FACE ID / FINGERPRINT
+        </button>
+
+
+        <div
+          id="lms-new-code-area"
+          style="
+            display:none;
+            margin-top:16px;
+          "
+        >
+
+          <input
+            id="lms-new-code"
+            maxlength="6"
+            inputmode="text"
+            autocomplete="off"
+            autocapitalize="characters"
+            placeholder="New code e.g. LMS051"
+            style="
+              width:100%;
+              box-sizing:border-box;
+              padding:14px;
+              font-size:20px;
+              font-weight:800;
+              text-align:center;
+              letter-spacing:2px;
+              border:2px solid #d1d5db;
+              border-radius:12px;
+              text-transform:uppercase;
+            "
+          />
+
+
+          <button
+            id="lms-change-code"
+            style="
+              width:100%;
+              margin-top:10px;
+              padding:14px;
+              border:0;
+              border-radius:12px;
+              background:#16a34a;
+              color:white;
+              font-weight:800;
+            "
+          >
+            CHANGE MY LOGIN CODE
+          </button>
+
+        </div>
+
+
+        <div
+          id="lms-security-message"
+          style="
+            min-height:22px;
+            margin-top:12px;
+            font-size:13px;
+            font-weight:700;
+          "
+        ></div>
+
+
+        <button
+          id="lms-security-close"
+          style="
+            width:100%;
+            margin-top:8px;
+            padding:12px;
+            border:1px solid #d1d5db;
+            border-radius:10px;
+            background:white;
+            font-weight:700;
+          "
+        >
+          CLOSE
+        </button>
+
+      </div>
     `;
 
-    button.addEventListener("click", function () {
-      if (
-        !confirm(
-          "Are you sure you want to change player?"
-        )
-      ) {
-        return;
+
+    document.body.appendChild(
+      overlay
+    );
+
+
+    document
+      .getElementById(
+        "lms-security-close"
+      )
+      .onclick =
+      () => overlay.remove();
+
+
+    document
+      .getElementById(
+        "lms-verify-security"
+      )
+      .onclick =
+      async function () {
+
+        const verify =
+          document.getElementById(
+            "lms-verify-security"
+          );
+
+        const area =
+          document.getElementById(
+            "lms-new-code-area"
+          );
+
+        const message =
+          document.getElementById(
+            "lms-security-message"
+          );
+
+
+        verify.disabled =
+          true;
+
+        verify.textContent =
+          "VERIFYING...";
+
+        message.textContent =
+          "Use your device passkey...";
+
+
+        try {
+
+          const {
+            error
+          } =
+            await supabaseClient.auth
+              .signInWithPasskey();
+
+
+          if (error) {
+            throw error;
+          }
+
+
+          const identity =
+            await getIdentity();
+
+
+          if (!identity) {
+
+            throw new Error(
+              "Player account could not be verified."
+            );
+          }
+
+
+          saveCode(
+            identity.player_code
+          );
+
+
+          area.style.display =
+            "block";
+
+
+          verify.textContent =
+            "VERIFIED";
+
+
+          verify.style.background =
+            "#16a34a";
+
+
+          message.textContent =
+            "Verified. Enter your new code below.";
+
+
+          message.style.color =
+            "#166534";
+
+
+        } catch (err) {
+
+          verify.disabled =
+            false;
+
+          verify.textContent =
+            "VERIFY WITH FACE ID / FINGERPRINT";
+
+
+          message.textContent =
+            err?.message ||
+            "Verification failed.";
+
+
+          message.style.color =
+            "#dc2626";
+        }
+      };
+
+
+    document
+      .getElementById(
+        "lms-change-code"
+      )
+      .onclick =
+      async function () {
+
+        const input =
+          document.getElementById(
+            "lms-new-code"
+          );
+
+        const button =
+          document.getElementById(
+            "lms-change-code"
+          );
+
+        const message =
+          document.getElementById(
+            "lms-security-message"
+          );
+
+
+        const newCode =
+          (
+            input?.value || ""
+          )
+            .trim()
+            .toUpperCase();
+
+
+        if (
+          !/^LMS\d{3}$/.test(
+            newCode
+          )
+        ) {
+
+          message.textContent =
+            "Use a code in the format LMS001.";
+
+          message.style.color =
+            "#dc2626";
+
+          return;
+        }
+
+
+        button.disabled =
+          true;
+
+        button.textContent =
+          "CHANGING...";
+
+
+        try {
+
+          const {
+            data,
+            error
+          } =
+            await supabaseClient.rpc(
+              "change_lms_player_code",
+              {
+                p_new_code:
+                  newCode
+              }
+            );
+
+
+          if (error) {
+            throw error;
+          }
+
+
+          if (
+            !data?.success
+          ) {
+
+            throw new Error(
+              data?.message ||
+              "Code could not be changed."
+            );
+          }
+
+
+          saveCode(
+            newCode
+          );
+
+
+          message.textContent =
+            "Your login code has been changed.";
+
+          message.style.color =
+            "#166534";
+
+
+          setTimeout(
+            function () {
+
+              overlay.remove();
+
+              if (
+                window.lmsSwitchPlayer
+              ) {
+
+                window.lmsSwitchPlayer(
+                  newCode
+                );
+
+              } else {
+
+                window.location.reload();
+
+              }
+
+            },
+            600
+          );
+
+
+        } catch (err) {
+
+          button.disabled =
+            false;
+
+          button.textContent =
+            "CHANGE MY LOGIN CODE";
+
+
+          message.textContent =
+            err?.message ||
+            "Code could not be changed.";
+
+
+          message.style.color =
+            "#dc2626";
+        }
+      };
+  }
+
+
+  /* =====================================================
+     INITIALISE
+     ===================================================== */
+
+  async function initialise() {
+
+    createLoginScreen();
+
+
+    try {
+
+      const {
+        createClient
+      } =
+        await import(
+          "https://esm.sh/@supabase/supabase-js@2.105.4"
+        );
+
+
+      supabaseClient =
+        createClient(
+          SUPABASE_URL,
+          SUPABASE_KEY,
+          {
+            auth: {
+
+              experimental: {
+                passkey: true
+              },
+
+              persistSession:
+                true,
+
+              autoRefreshToken:
+                true,
+
+              detectSessionInUrl:
+                false
+            }
+          }
+        );
+
+
+      window.lmsSupabase =
+        supabaseClient;
+
+
+      const identity =
+        await restoreExistingSession();
+
+
+      const savedCode =
+        getSavedCode();
+
+
+      if (identity) {
+
+        hideLogin();
+
+        return true;
       }
 
+
+      showLogin();
+
+
+      setLoginMessage(
+        savedCode
+          ? "Use Face ID / fingerprint. If this is your first secure login, enter your player code below."
+          : "First, enter your player code to set up secure login."
+      );
+
+
+      return false;
+
+
+    } catch (err) {
+
+      console.error(
+        "LMS authentication startup error:",
+        err
+      );
+
+
+      showLogin();
+
+
+      setLoginMessage(
+        "Secure login could not start. Please refresh the app.",
+        true
+      );
+
+
+      return false;
+    }
+  }
+
+
+  window.lmsAuthReady =
+    initialise();
+
+
+  window.lmsShowLogin =
+    function () {
+
       clearCode();
+
+      if (supabaseClient) {
+
+        supabaseClient.auth
+          .signOut({
+            scope: "local"
+          });
+      }
+
+      showLogin();
+    };
+
+
+  window.lmsLogoutPlayer =
+    async function () {
+
+      clearCode();
+
+      if (supabaseClient) {
+
+        await supabaseClient.auth
+          .signOut({
+            scope: "local"
+          });
+      }
+
 
       window.location.href =
         window.location.pathname +
         "?login=" +
         Date.now();
-    });
+    };
 
-    playerCard.appendChild(button);
-  }
 
-  function startLoginSystem() {
-    createLoginScreen();
+  document.addEventListener(
+    "DOMContentLoaded",
+    function () {
 
-    const savedCode = getSavedCode();
+      setTimeout(
+        addSecurityButton,
+        1800
+      );
 
-    /*
-     * If there is no saved player code,
-     * show the login screen.
-     */
-    if (!savedCode) {
-      showLogin();
-      return;
     }
+  );
 
-    /*
-     * A saved code means the player has already logged in.
-     * Do not show the login screen.
-     */
-    hideLogin();
-
-    /*
-     * Give app.js time to render the player card.
-     */
-    setTimeout(function () {
-      addLogoutButton();
-    }, 1500);
-  }
-
-  /*
-   * Make these available to the rest of the app if needed.
-   */
-  window.lmsShowLogin = function () {
-    clearCode();
-    showLogin();
-  };
-
-  window.lmsLogoutPlayer = function () {
-    clearCode();
-
-    window.location.href =
-      window.location.pathname +
-      "?login=" +
-      Date.now();
-  };
-
-  /*
-   * Start after the page has loaded.
-   */
-  if (document.readyState === "loading") {
-    document.addEventListener(
-      "DOMContentLoaded",
-      startLoginSystem
-    );
-  } else {
-    startLoginSystem();
-  }
 })();
