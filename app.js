@@ -16,18 +16,27 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 
+
+/* =====================================================
+   SUPABASE
+   ===================================================== */
+
 async function callRpc(name, body) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/rpc/${name}`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    }
+  );
 
   const text = await response.text();
+
   let data = null;
 
   try {
@@ -53,15 +62,34 @@ function first(value) {
 
 function money(value) {
   const n = Number(value);
-  return Number.isFinite(n) ? `£${n}` : "£5";
+
+  return Number.isFinite(n)
+    ? `£${n.toFixed(2)}`
+    : "£5.00";
 }
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+/* =====================================================
+   DATES
+   ===================================================== */
 
 function formatDate(value) {
   if (!value) return "";
 
   const d = new Date(value);
 
-  if (Number.isNaN(d.getTime())) return "";
+  if (Number.isNaN(d.getTime())) {
+    return "";
+  }
 
   return d.toLocaleString("en-GB", {
     weekday: "short",
@@ -70,122 +98,6 @@ function formatDate(value) {
     hour: "2-digit",
     minute: "2-digit"
   });
-}
-
-function normaliseDashboard(raw) {
-  const data = first(raw) || {};
-
-  return {
-    success: data.success !== false,
-    player: data.player || {},
-    competition: data.competition || {},
-    current_round: data.current_round || data.round || {},
-    selection: data.selection || null,
-    used_teams: data.used_teams || [],
-    fixtures: data.fixtures || []
-  };
-}
-
-function getUsedTeams() {
-  const ids = new Set();
-  const names = new Set();
-
-  (state.data?.used_teams || []).forEach((team) => {
-    if (!team) return;
-
-    if (typeof team === "string") {
-      names.add(team.trim().toLowerCase());
-      return;
-    }
-
-    const id = team.team_id || team.id;
-    const name = team.team_name || team.name || team.short_name;
-
-    if (id) {
-      ids.add(String(id));
-    }
-
-    if (name) {
-      names.add(String(name).trim().toLowerCase());
-    }
-  });
-
-  return { ids, names };
-}
-
-function isTeamUsed(teamId, teamName, used) {
-  if (teamId && used.ids.has(String(teamId))) {
-    return true;
-  }
-
-  if (
-    teamName &&
-    used.names.has(String(teamName).trim().toLowerCase())
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
-function getFixtureHomeId(fixture) {
-  return (
-    fixture.home_team_id ||
-    fixture.home_id ||
-    fixture.homeTeamId ||
-    null
-  );
-}
-
-function getFixtureAwayId(fixture) {
-  return (
-    fixture.away_team_id ||
-    fixture.away_id ||
-    fixture.awayTeamId ||
-    null
-  );
-}
-
-function getFixtureHomeName(fixture) {
-  return (
-    fixture.home_name ||
-    fixture.home_team ||
-    fixture.home ||
-    fixture.homeTeam ||
-    "Home"
-  );
-}
-
-function getFixtureAwayName(fixture) {
-  return (
-    fixture.away_name ||
-    fixture.away_team ||
-    fixture.away ||
-    fixture.awayTeam ||
-    "Away"
-  );
-}
-
-function getTeamNameFromFixture(fixture, teamId) {
-  if (!fixture) {
-    return "Team selected";
-  }
-
-  if (
-    String(getFixtureHomeId(fixture)) ===
-    String(teamId)
-  ) {
-    return getFixtureHomeName(fixture);
-  }
-
-  if (
-    String(getFixtureAwayId(fixture)) ===
-    String(teamId)
-  ) {
-    return getFixtureAwayName(fixture);
-  }
-
-  return "Team selected";
 }
 
 function deadlinePassed() {
@@ -202,18 +114,602 @@ function deadlinePassed() {
   );
 }
 
+
+/* =====================================================
+   PLAYER DATA
+   ===================================================== */
+
+function normaliseDashboard(raw) {
+  const data = first(raw) || {};
+
+  return {
+    success: data.success !== false,
+    player: data.player || {},
+    competition: data.competition || {},
+    current_round:
+      data.current_round ||
+      data.round ||
+      {},
+    selection:
+      data.selection ||
+      null,
+    used_teams:
+      data.used_teams ||
+      [],
+    fixtures:
+      data.fixtures ||
+      []
+  };
+}
+
+function isPaymentDue() {
+  return (
+    String(
+      state.data?.player?.status || ""
+    ).toLowerCase() === "payment_due"
+  );
+}
+
+function isRolloverGame() {
+  const player =
+    state.data?.player || {};
+
+  const competition =
+    state.data?.competition || {};
+
+  return (
+    Number(
+      player.rollover_number || 0
+    ) > 0 ||
+    Number(
+      competition.rollover_number || 0
+    ) > 0
+  );
+}
+
 function roundIsOpen() {
   const round =
     state.data?.current_round || {};
 
+  const status =
+    String(
+      state.data?.player?.status || ""
+    ).toLowerCase();
+
   return (
     round.status === "open" &&
-    !deadlinePassed()
+    !deadlinePassed() &&
+    status !== "payment_due" &&
+    status !== "eliminated" &&
+    status !== "removed"
   );
 }
 
+
+/* =====================================================
+   TEAM / FIXTURE HELPERS
+   ===================================================== */
+
+function getUsedTeams() {
+  const ids = new Set();
+  const names = new Set();
+
+  (
+    state.data?.used_teams ||
+    []
+  ).forEach((team) => {
+
+    if (!team) {
+      return;
+    }
+
+    if (typeof team === "string") {
+      names.add(
+        team.trim().toLowerCase()
+      );
+      return;
+    }
+
+    const id =
+      team.team_id ||
+      team.id;
+
+    const name =
+      team.team_name ||
+      team.name ||
+      team.short_name;
+
+    if (id) {
+      ids.add(String(id));
+    }
+
+    if (name) {
+      names.add(
+        String(name)
+          .trim()
+          .toLowerCase()
+      );
+    }
+  });
+
+  return {
+    ids,
+    names
+  };
+}
+
+function isTeamUsed(
+  teamId,
+  teamName,
+  used
+) {
+  if (
+    teamId &&
+    used.ids.has(String(teamId))
+  ) {
+    return true;
+  }
+
+  if (
+    teamName &&
+    used.names.has(
+      String(teamName)
+        .trim()
+        .toLowerCase()
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function getFixtureHomeId(
+  fixture
+) {
+  return (
+    fixture.home_team_id ||
+    fixture.home_id ||
+    fixture.homeTeamId ||
+    null
+  );
+}
+
+function getFixtureAwayId(
+  fixture
+) {
+  return (
+    fixture.away_team_id ||
+    fixture.away_id ||
+    fixture.awayTeamId ||
+    null
+  );
+}
+
+function getFixtureHomeName(
+  fixture
+) {
+  return (
+    fixture.home_name ||
+    fixture.home_team ||
+    fixture.home ||
+    fixture.homeTeam ||
+    "Home"
+  );
+}
+
+function getFixtureAwayName(
+  fixture
+) {
+  return (
+    fixture.away_name ||
+    fixture.away_team ||
+    fixture.away ||
+    fixture.awayTeam ||
+    "Away"
+  );
+}
+
+function getTeamNameFromFixture(
+  fixture,
+  teamId
+) {
+  if (!fixture) {
+    return "Team selected";
+  }
+
+  if (
+    String(
+      getFixtureHomeId(fixture)
+    ) === String(teamId)
+  ) {
+    return getFixtureHomeName(
+      fixture
+    );
+  }
+
+  if (
+    String(
+      getFixtureAwayId(fixture)
+    ) === String(teamId)
+  ) {
+    return getFixtureAwayName(
+      fixture
+    );
+  }
+
+  return "Team selected";
+}
+
+
+/* =====================================================
+   ROLLOVER NOTICE
+   ===================================================== */
+
+function ensureRolloverNotice() {
+  let notice =
+    document.getElementById(
+      "rolloverNotice"
+    );
+
+  if (notice) {
+    return notice;
+  }
+
+  notice =
+    document.createElement(
+      "section"
+    );
+
+  notice.id =
+    "rolloverNotice";
+
+  notice.style.display =
+    "none";
+
+  const main =
+    document.querySelector(
+      "main"
+    );
+
+  if (main) {
+    main.insertBefore(
+      notice,
+      main.firstChild
+    );
+  }
+
+  return notice;
+}
+
+function renderRolloverNotice() {
+  const notice =
+    ensureRolloverNotice();
+
+  if (!notice) {
+    return;
+  }
+
+  const player =
+    state.data?.player || {};
+
+  const competition =
+    state.data?.competition || {};
+
+  if (!isRolloverGame()) {
+    notice.style.display =
+      "none";
+
+    notice.innerHTML = "";
+
+    return;
+  }
+
+  const rolloverNumber =
+    Number(
+      player.rollover_number ??
+      competition.rollover_number ??
+      0
+    );
+
+  const entryFee =
+    player.entry_fee ??
+    player.rollover_entry_fee ??
+    competition.entry_fee ??
+    5;
+
+  const prizePot =
+    competition.prize_pot ??
+    0;
+
+  const paymentDue =
+    isPaymentDue();
+
+  const rejoined =
+    player.rejoined === true;
+
+  if (paymentDue) {
+
+    notice.style.display =
+      "";
+
+    notice.innerHTML = `
+      <div
+        style="
+          background:linear-gradient(
+            135deg,
+            rgba(245,158,11,.15),
+            rgba(255,255,255,.04)
+          );
+          border:1px solid rgba(245,158,11,.30);
+          border-radius:18px;
+          padding:18px;
+          margin-bottom:16px;
+        "
+      >
+
+        <div
+          style="
+            font-size:12px;
+            font-weight:900;
+            letter-spacing:.10em;
+            text-transform:uppercase;
+            color:#fcd34d;
+          "
+        >
+          NEW GAME
+        </div>
+
+        <div
+          style="
+            font-size:22px;
+            font-weight:900;
+            margin-top:5px;
+          "
+        >
+          Rollover Game ${rolloverNumber}
+        </div>
+
+        <div
+          style="
+            margin-top:9px;
+            line-height:1.5;
+            opacity:.82;
+          "
+        >
+          The previous game has ended and
+          a new game has started.
+          Your place is reserved, but payment
+          is required before you can make a selection.
+        </div>
+
+        <div
+          style="
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:10px;
+            margin-top:15px;
+          "
+        >
+
+          <div
+            style="
+              background:rgba(255,255,255,.05);
+              border-radius:12px;
+              padding:11px;
+            "
+          >
+
+            <div
+              style="
+                font-size:11px;
+                opacity:.6;
+                text-transform:uppercase;
+              "
+            >
+              Your entry
+            </div>
+
+            <div
+              style="
+                font-size:20px;
+                font-weight:900;
+                margin-top:3px;
+              "
+            >
+              ${money(entryFee)}
+            </div>
+
+          </div>
+
+          <div
+            style="
+              background:rgba(255,255,255,.05);
+              border-radius:12px;
+              padding:11px;
+            "
+          >
+
+            <div
+              style="
+                font-size:11px;
+                opacity:.6;
+                text-transform:uppercase;
+              "
+            >
+              Prize pot
+            </div>
+
+            <div
+              style="
+                font-size:20px;
+                font-weight:900;
+                margin-top:3px;
+              "
+            >
+              ${money(prizePot)}
+            </div>
+
+          </div>
+
+        </div>
+
+        <div
+          style="
+            margin-top:14px;
+            padding:10px 12px;
+            border-radius:12px;
+            background:rgba(245,158,11,.10);
+            color:#fcd34d;
+            font-weight:800;
+            font-size:13px;
+          "
+        >
+          PAYMENT REQUIRED
+        </div>
+
+        <div
+          style="
+            margin-top:6px;
+            font-size:12px;
+            opacity:.65;
+          "
+        >
+          Please contact the administrator
+          to arrange payment.
+        </div>
+
+      </div>
+    `;
+
+    return;
+  }
+
+  if (rejoined) {
+
+    notice.style.display =
+      "";
+
+    notice.innerHTML = `
+      <div
+        style="
+          background:rgba(34,197,94,.08);
+          border:1px solid rgba(34,197,94,.22);
+          border-radius:18px;
+          padding:16px 18px;
+          margin-bottom:16px;
+        "
+      >
+
+        <div
+          style="
+            color:#86efac;
+            font-size:12px;
+            font-weight:900;
+            letter-spacing:.10em;
+            text-transform:uppercase;
+          "
+        >
+          NEW GAME
+        </div>
+
+        <div
+          style="
+            font-size:20px;
+            font-weight:900;
+            margin-top:4px;
+          "
+        >
+          You're back in!
+        </div>
+
+        <div
+          style="
+            margin-top:7px;
+            opacity:.75;
+            line-height:1.45;
+          "
+        >
+          Rollover Game ${rolloverNumber}
+          is underway.
+          Your entry has been paid and all
+          Premier League teams are available again.
+        </div>
+
+        <div
+          style="
+            margin-top:10px;
+            font-weight:800;
+            color:#86efac;
+          "
+        >
+          Entry paid: ${money(entryFee)}
+        </div>
+
+      </div>
+    `;
+
+    return;
+  }
+
+  notice.style.display =
+    "";
+
+  notice.innerHTML = `
+    <div
+      style="
+        background:rgba(255,255,255,.04);
+        border:1px solid rgba(255,255,255,.10);
+        border-radius:18px;
+        padding:16px 18px;
+        margin-bottom:16px;
+      "
+    >
+
+      <div
+        style="
+          font-size:12px;
+          font-weight:900;
+          letter-spacing:.10em;
+          text-transform:uppercase;
+          opacity:.65;
+        "
+      >
+        NEW GAME
+      </div>
+
+      <div
+        style="
+          font-size:20px;
+          font-weight:900;
+          margin-top:4px;
+        "
+      >
+        Rollover Game ${rolloverNumber}
+      </div>
+
+      <div
+        style="
+          margin-top:7px;
+          opacity:.75;
+        "
+      >
+        All Premier League teams are
+        available again.
+      </div>
+
+    </div>
+  `;
+}
+
+
+/* =====================================================
+   DASHBOARD
+   ===================================================== */
+
 function renderDashboard() {
-  const d = state.data;
+  const d =
+    state.data;
 
   if (!d) {
     return;
@@ -229,7 +725,8 @@ function renderDashboard() {
     d.current_round || {};
 
   $("playerName").textContent =
-    player.name || PLAYER_CODE;
+    player.name ||
+    PLAYER_CODE;
 
   $("roundNumber").textContent =
     round.round_number
@@ -239,23 +736,39 @@ function renderDashboard() {
   let statusText =
     "Waiting to start";
 
+  const playerStatus =
+    String(
+      player.status ||
+      ""
+    ).toLowerCase();
+
   if (
-    round.status === "open"
+    playerStatus ===
+    "payment_due"
+  ) {
+    statusText =
+      "Payment required";
+  } else if (
+    round.status ===
+    "open"
   ) {
     statusText =
       "Choose your team";
   } else if (
-    round.status === "locked"
+    round.status ===
+    "locked"
   ) {
     statusText =
       "Selections locked";
   } else if (
-    round.status === "in_progress"
+    round.status ===
+    "in_progress"
   ) {
     statusText =
       "Round in progress";
   } else if (
-    round.status === "completed"
+    round.status ===
+    "completed"
   ) {
     statusText =
       "Round completed";
@@ -277,6 +790,7 @@ function renderDashboard() {
     );
 
   if (badge) {
+
     const status =
       String(
         player.status ||
@@ -289,7 +803,8 @@ function renderDashboard() {
     badge.className =
       "badge " +
       (
-        status === "ALIVE"
+        status ===
+        "ALIVE"
           ? "alive"
           : ""
       );
@@ -303,6 +818,7 @@ function renderDashboard() {
   if (
     stats.length >= 3
   ) {
+
     stats[0].textContent =
       (
         d.used_teams ||
@@ -315,6 +831,7 @@ function renderDashboard() {
 
     stats[2].textContent =
       money(
+        player.entry_fee ??
         competition.entry_fee
       );
   }
@@ -323,12 +840,9 @@ function renderDashboard() {
     round.selection_deadline ||
     null;
 
-  /*
-    If the player has picked a new team but hasn't
-    confirmed it yet, don't let the background refresh
-    overwrite that choice.
-  */
-  if (!state.pendingSelection) {
+  if (
+    !state.pendingSelection
+  ) {
     state.selectionTeamId =
       d.selection?.team_id ||
       null;
@@ -341,6 +855,7 @@ function renderDashboard() {
     state.pendingSelection &&
     state.selectionTeamId
   ) {
+
     const pendingFixture =
       (
         d.fixtures ||
@@ -381,6 +896,7 @@ function renderDashboard() {
       !selectedTeamName &&
       state.selectionTeamId
     ) {
+
       const selectedFixture =
         (
           d.fixtures ||
@@ -427,27 +943,44 @@ function renderDashboard() {
           "WAITING"
         ).toUpperCase();
 
+  renderRolloverNotice();
+
   renderFixtures();
 
   const hint =
     $("selectionHint");
 
   if (hint) {
-    hint.textContent =
-      selectedTeamName
-        ? `Your current selection is ${selectedTeamName}. You can change it until the deadline.`
-        : "Choose one Premier League team to win its game.";
+
+    if (isPaymentDue()) {
+
+      hint.textContent =
+        "Payment is required before you can make a selection.";
+
+    } else {
+
+      hint.textContent =
+        selectedTeamName
+          ? `Your current selection is ${selectedTeamName}. You can change it until the deadline.`
+          : "Choose one Premier League team to win its game.";
+    }
   }
 
   updateCountdown();
 }
+
+
+/* =====================================================
+   FIXTURES
+   ===================================================== */
 
 function renderFixtures() {
   const el =
     $("fixtures");
 
   const fixtures =
-    state.data?.fixtures || [];
+    state.data?.fixtures ||
+    [];
 
   const used =
     getUsedTeams();
@@ -458,12 +991,12 @@ function renderFixtures() {
   if (
     !fixtures.length
   ) {
-    el.innerHTML =
-      `
-        <div class="empty-state">
-          No fixtures are available for this round.
-        </div>
-      `;
+
+    el.innerHTML = `
+      <div class="empty-state">
+        No fixtures are available for this round.
+      </div>
+    `;
 
     $("confirmBtn")
       .disabled = true;
@@ -561,8 +1094,7 @@ function renderFixtures() {
 
             const usedStyle =
               usedAlready
-                ?
-                `
+                ? `
                   style="
                     background:#3a3f48;
                     border-color:#555b65;
@@ -571,8 +1103,7 @@ function renderFixtures() {
                     cursor:not-allowed;
                   "
                 `
-                :
-                "";
+                : "";
 
             return `
               <button
@@ -726,11 +1257,25 @@ function renderFixtures() {
     !open;
 }
 
+
+/* =====================================================
+   SAVE SELECTION
+   ===================================================== */
+
 async function saveSelection() {
 
   if (
     !state.selectionTeamId
   ) {
+    return;
+  }
+
+  if (isPaymentDue()) {
+
+    $("selectionHint")
+      .textContent =
+      "Payment is required before you can make a selection.";
+
     return;
   }
 
@@ -958,8 +1503,7 @@ async function loadPlayer(
       "Unable to load competition";
 
     $("fixtures")
-      .innerHTML =
-      `
+      .innerHTML = `
         <div class="empty-state">
           ${
             error?.message ||
@@ -969,8 +1513,7 @@ async function loadPlayer(
       `;
 
     $("confirmBtn")
-      .disabled =
-      true;
+      .disabled = true;
 
   } finally {
 
@@ -978,6 +1521,11 @@ async function loadPlayer(
       false;
   }
 }
+
+
+/* =====================================================
+   COUNTDOWN
+   ===================================================== */
 
 function updateCountdown() {
 
@@ -1109,43 +1657,41 @@ function ensureHistoryView() {
   historyView.style.display =
     "none";
 
-  historyView.innerHTML =
-    `
-      <div class="section-title">
+  historyView.innerHTML = `
+    <div class="section-title">
 
-        <div>
+      <div>
 
-          <span class="muted">
-            YOUR JOURNEY
-          </span>
+        <span class="muted">
+          YOUR JOURNEY
+        </span>
 
-          <h2>
-            Selection History
-          </h2>
-
-        </div>
+        <h2>
+          Selection History
+        </h2>
 
       </div>
 
-      <div id="historySummary"></div>
+    </div>
 
-      <div id="historyContent">
+    <div id="historySummary"></div>
 
-        <div class="empty-state">
-          Loading your history...
-        </div>
+    <div id="historyContent">
 
+      <div class="empty-state">
+        Loading your history...
       </div>
-    `;
+
+    </div>
+  `;
 
   const main =
     document.querySelector(
       "main"
     );
 
-  if (
-    main
-  ) {
+  if (main) {
+
     main.appendChild(
       historyView
     );
@@ -1273,18 +1819,6 @@ function resultIcon(result) {
   return "•";
 }
 
-function escapeHtml(value) {
-
-  return String(
-    value ?? ""
-  )
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 function renderHistorySummary() {
 
   const summary =
@@ -1318,7 +1852,8 @@ function renderHistorySummary() {
       (item) =>
         ["win", "through"].includes(
           String(
-            item.result || ""
+            item.result ||
+            ""
           ).toLowerCase()
         )
     ).length;
@@ -1327,7 +1862,8 @@ function renderHistorySummary() {
     history.filter(
       (item) =>
         String(
-          item.result || ""
+          item.result ||
+          ""
         ).toLowerCase() ===
         "loss"
     ).length;
@@ -1336,114 +1872,120 @@ function renderHistorySummary() {
     history.filter(
       (item) =>
         String(
-          item.selection_type || ""
+          item.selection_type ||
+          ""
         ).toLowerCase() ===
         "automatic"
     ).length;
 
-  summary.innerHTML =
-    `
+  summary.innerHTML = `
+    <div
+      style="
+        display:grid;
+        grid-template-columns:repeat(3,1fr);
+        gap:10px;
+        margin:14px 0 18px;
+      "
+    >
+
       <div
         style="
-          display:grid;
-          grid-template-columns:repeat(3,1fr);
-          gap:10px;
-          margin:14px 0 18px;
+          background:rgba(255,255,255,0.04);
+          border:1px solid rgba(255,255,255,0.08);
+          border-radius:14px;
+          padding:12px;
+          text-align:center;
         "
       >
 
         <div
           style="
-            background:rgba(255,255,255,0.04);
-            border:1px solid rgba(255,255,255,0.08);
-            border-radius:14px;
-            padding:12px;
-            text-align:center;
+            font-size:22px;
+            font-weight:800;
           "
         >
-          <div
-            style="
-              font-size:22px;
-              font-weight:800;
-            "
-          >
-            ${wins}
-          </div>
-
-          <div
-            style="
-              font-size:11px;
-              opacity:.65;
-              text-transform:uppercase;
-              margin-top:3px;
-            "
-          >
-            Through
-          </div>
+          ${wins}
         </div>
 
         <div
           style="
-            background:rgba(255,255,255,0.04);
-            border:1px solid rgba(255,255,255,0.08);
-            border-radius:14px;
-            padding:12px;
-            text-align:center;
+            font-size:11px;
+            opacity:.65;
+            text-transform:uppercase;
+            margin-top:3px;
           "
         >
-          <div
-            style="
-              font-size:22px;
-              font-weight:800;
-            "
-          >
-            ${losses}
-          </div>
-
-          <div
-            style="
-              font-size:11px;
-              opacity:.65;
-              text-transform:uppercase;
-              margin-top:3px;
-            "
-          >
-            Losses
-          </div>
-        </div>
-
-        <div
-          style="
-            background:rgba(255,255,255,0.04);
-            border:1px solid rgba(255,255,255,0.08);
-            border-radius:14px;
-            padding:12px;
-            text-align:center;
-          "
-        >
-          <div
-            style="
-              font-size:22px;
-              font-weight:800;
-            "
-          >
-            ${automatic}
-          </div>
-
-          <div
-            style="
-              font-size:11px;
-              opacity:.65;
-              text-transform:uppercase;
-              margin-top:3px;
-            "
-          >
-            Automatic
-          </div>
+          Through
         </div>
 
       </div>
-    `;
+
+      <div
+        style="
+          background:rgba(255,255,255,0.04);
+          border:1px solid rgba(255,255,255,0.08);
+          border-radius:14px;
+          padding:12px;
+          text-align:center;
+        "
+      >
+
+        <div
+          style="
+            font-size:22px;
+            font-weight:800;
+          "
+        >
+          ${losses}
+        </div>
+
+        <div
+          style="
+            font-size:11px;
+            opacity:.65;
+            text-transform:uppercase;
+            margin-top:3px;
+          "
+        >
+          Losses
+        </div>
+
+      </div>
+
+      <div
+        style="
+          background:rgba(255,255,255,0.04);
+          border:1px solid rgba(255,255,255,0.08);
+          border-radius:14px;
+          padding:12px;
+          text-align:center;
+        "
+      >
+
+        <div
+          style="
+            font-size:22px;
+            font-weight:800;
+          "
+        >
+          ${automatic}
+        </div>
+
+        <div
+          style="
+            font-size:11px;
+            opacity:.65;
+            text-transform:uppercase;
+            margin-top:3px;
+          "
+        >
+          Automatic
+        </div>
+
+      </div>
+
+    </div>
+  `;
 }
 
 function renderHistory() {
@@ -1473,43 +2015,44 @@ function renderHistory() {
     !history.length
   ) {
 
-    content.innerHTML =
-      `
+    content.innerHTML = `
+      <div
+        class="empty-state"
+        style="
+          padding:30px 10px;
+          text-align:center;
+        "
+      >
+
         <div
-          class="empty-state"
           style="
-            padding:30px 10px;
-            text-align:center;
+            font-size:34px;
+            margin-bottom:10px;
           "
         >
-          <div
-            style="
-              font-size:34px;
-              margin-bottom:10px;
-            "
-          >
-            🏆
-          </div>
-
-          <div
-            style="
-              font-weight:800;
-              font-size:17px;
-            "
-          >
-            Your journey starts here
-          </div>
-
-          <div
-            style="
-              opacity:.65;
-              margin-top:7px;
-            "
-          >
-            Your completed rounds will appear here.
-          </div>
+          🏆
         </div>
-      `;
+
+        <div
+          style="
+            font-weight:800;
+            font-size:17px;
+          "
+        >
+          Your journey starts here
+        </div>
+
+        <div
+          style="
+            opacity:.65;
+            margin-top:7px;
+          "
+        >
+          Your completed rounds will appear here.
+        </div>
+
+      </div>
+    `;
 
     return;
   }
@@ -1536,66 +2079,55 @@ function renderHistory() {
               item.result
             );
 
-          const resultColour =
-            resultStyle(
-              item.result
-            );
-
-          const icon =
-            resultIcon(
-              item.result
-            );
-
           const kickoff =
             formatDate(
               item.kickoff_time
             );
 
-          const selectionType =
+          const automatic =
             String(
               item.selection_type ||
               "manual"
-            ).toLowerCase();
-
-          const automatic =
-            selectionType ===
+            ).toLowerCase() ===
             "automatic";
 
           let score =
             "";
 
           if (
-            item.home_score !== null &&
-            item.home_score !== undefined &&
-            item.away_score !== null &&
-            item.away_score !== undefined
+            item.home_score !==
+              null &&
+            item.home_score !==
+              undefined &&
+            item.away_score !==
+              null &&
+            item.away_score !==
+              undefined
           ) {
 
-            score =
-              `
-                <div
-                  style="
-                    font-size:26px;
-                    font-weight:900;
-                    margin-top:10px;
-                    letter-spacing:.04em;
-                  "
-                >
-                  ${escapeHtml(
-                    item.home_score
-                  )}
-                  -
-                  ${escapeHtml(
-                    item.away_score
-                  )}
-                </div>
-              `;
+            score = `
+              <div
+                style="
+                  font-size:26px;
+                  font-weight:900;
+                  margin-top:10px;
+                  letter-spacing:.04em;
+                "
+              >
+                ${escapeHtml(
+                  item.home_score
+                )}
+                -
+                ${escapeHtml(
+                  item.away_score
+                )}
+              </div>
+            `;
           }
 
           const selectionBadge =
             automatic
-              ?
-              `
+              ? `
                 <div
                   style="
                     display:inline-flex;
@@ -1610,14 +2142,12 @@ function renderHistory() {
                     font-size:11px;
                     font-weight:800;
                     text-transform:uppercase;
-                    letter-spacing:.04em;
                   "
                 >
                   ⚠ Automatic selection
                 </div>
               `
-              :
-              `
+              : `
                 <div
                   style="
                     display:inline-flex;
@@ -1631,7 +2161,6 @@ function renderHistory() {
                     font-size:11px;
                     font-weight:700;
                     text-transform:uppercase;
-                    letter-spacing:.04em;
                   "
                 >
                   Your selection
@@ -1695,17 +2224,22 @@ function renderHistory() {
                     gap:5px;
                     font-weight:900;
                     font-size:14px;
-                    ${resultColour}
+                    ${resultStyle(
+                      item.result
+                    )}
                     white-space:nowrap;
                   "
                 >
                   <span>
-                    ${icon}
+                    ${resultIcon(
+                      item.result
+                    )}
                   </span>
 
                   <span>
                     ${result}
                   </span>
+
                 </div>
 
               </div>
@@ -1757,12 +2291,11 @@ async function loadHistory() {
 
   if (content) {
 
-    content.innerHTML =
-      `
-        <div class="empty-state">
-          Loading your history...
-        </div>
-      `;
+    content.innerHTML = `
+      <div class="empty-state">
+        Loading your history...
+      </div>
+    `;
   }
 
   try {
@@ -1795,23 +2328,20 @@ async function loadHistory() {
 
     if (content) {
 
-      content.innerHTML =
-        `
-          <div class="empty-state">
+      content.innerHTML = `
+        <div class="empty-state">
 
-            Could not load your history.
+          Could not load your history.
 
-            <br><br>
+          <br><br>
 
-            ${
-              escapeHtml(
-                error?.message ||
-                "Please try again."
-              )
-            }
+          ${escapeHtml(
+            error?.message ||
+            "Please try again."
+          )}
 
-          </div>
-        `;
+        </div>
+      `;
     }
   }
 }
@@ -1835,6 +2365,9 @@ function setMainView(view) {
   const historyView =
     ensureHistoryView();
 
+  const rolloverNotice =
+    ensureRolloverNotice();
+
   const children =
     Array.from(
       main.children
@@ -1847,6 +2380,20 @@ function setMainView(view) {
         child ===
         historyView
       ) {
+        return;
+      }
+
+      if (
+        child ===
+        rolloverNotice
+      ) {
+
+        child.style.display =
+          view === "home" &&
+          isRolloverGame()
+            ? ""
+            : "none";
+
         return;
       }
 
@@ -1969,6 +2516,8 @@ function startApp() {
   }
 
   setupNavigation();
+
+  ensureRolloverNotice();
 
   loadPlayer(false);
 
