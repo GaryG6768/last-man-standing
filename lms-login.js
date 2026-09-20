@@ -1,25 +1,43 @@
 (function () {
-  const SUPABASE_URL = "https://tkhykusvmsceleflynok.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
 
   function getSavedCode() {
     return localStorage.getItem("lms_player_code") || "";
   }
 
   function saveCode(code) {
-    localStorage.setItem("lms_player_code", code);
+    localStorage.setItem(
+      "lms_player_code",
+      code
+    );
   }
 
   function clearCode() {
-    localStorage.removeItem("lms_player_code");
+    localStorage.removeItem(
+      "lms_player_code"
+    );
   }
 
+
+  /* =====================================================
+     LOGIN SCREEN
+     ===================================================== */
+
   function showLogin(message = "") {
-    let overlay = document.getElementById("lms-login-overlay");
+
+    let overlay =
+      document.getElementById(
+        "lms-login-overlay"
+      );
 
     if (!overlay) {
-      overlay = document.createElement("div");
-      overlay.id = "lms-login-overlay";
+
+      overlay =
+        document.createElement(
+          "div"
+        );
+
+      overlay.id =
+        "lms-login-overlay";
 
       overlay.style.cssText = `
         position:fixed;
@@ -35,6 +53,7 @@
       `;
 
       overlay.innerHTML = `
+
         <div style="
           width:100%;
           max-width:420px;
@@ -123,138 +142,249 @@
         </div>
       `;
 
-      document.body.appendChild(overlay);
+      document.body.appendChild(
+        overlay
+      );
+
 
       document
-        .getElementById("lms-login-button")
-        .addEventListener("click", login);
+        .getElementById(
+          "lms-login-button"
+        )
+        .addEventListener(
+          "click",
+          login
+        );
+
 
       document
-        .getElementById("lms-login-code")
-        .addEventListener("keydown", function (event) {
-          if (event.key === "Enter") {
-            login();
+        .getElementById(
+          "lms-login-code"
+        )
+        .addEventListener(
+          "keydown",
+          function (event) {
+
+            if (
+              event.key ===
+              "Enter"
+            ) {
+              login();
+            }
+
           }
-        });
+        );
     }
 
-    overlay.style.display = "flex";
 
-    const error = document.getElementById("lms-login-error");
+    overlay.style.display =
+      "flex";
+
+
+    const error =
+      document.getElementById(
+        "lms-login-error"
+      );
 
     if (error) {
-      error.textContent = message;
+      error.textContent =
+        message;
     }
 
-    const input = document.getElementById("lms-login-code");
+
+    const input =
+      document.getElementById(
+        "lms-login-code"
+      );
 
     if (input) {
-      input.value = getSavedCode();
 
-      setTimeout(function () {
-        input.focus();
-      }, 100);
+      input.value =
+        getSavedCode();
+
+      setTimeout(
+        function () {
+          input.focus();
+        },
+        100
+      );
     }
   }
+
 
   function hideLogin() {
-    const overlay = document.getElementById("lms-login-overlay");
+
+    const overlay =
+      document.getElementById(
+        "lms-login-overlay"
+      );
 
     if (overlay) {
-      overlay.style.display = "none";
+
+      overlay.style.display =
+        "none";
     }
   }
 
-  async function checkCode(code) {
-    const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/get_lms_player_data`,
-      {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          p_player_code: code
-        })
-      }
-    );
 
-    if (!response.ok) {
-      throw new Error("Unable to check player code");
-    }
-
-    const data = await response.json();
-
-    return data && data.success && data.player;
-  }
+  /* =====================================================
+     LOGIN
+     ===================================================== */
 
   async function login() {
-    const input = document.getElementById("lms-login-code");
-    const button = document.getElementById("lms-login-button");
-    const error = document.getElementById("lms-login-error");
 
-    if (!input) return;
+    const input =
+      document.getElementById(
+        "lms-login-code"
+      );
 
-    const code = input.value.trim().toUpperCase();
+    const button =
+      document.getElementById(
+        "lms-login-button"
+      );
 
-    if (!/^LMS\d{3}$/.test(code)) {
-      error.textContent =
-        "Please enter a valid player code, for example LMS001.";
+    const error =
+      document.getElementById(
+        "lms-login-error"
+      );
+
+
+    if (!input) {
       return;
     }
 
-    button.disabled = true;
-    button.textContent = "CHECKING...";
-    error.textContent = "";
 
-    try {
-      const player = await checkCode(code);
+    const code =
+      input.value
+        .trim()
+        .toUpperCase();
 
-      if (!player) {
-        throw new Error("Player not found");
-      }
 
-      /*
-       * IMPORTANT:
-       * Save the new player code and reload the entire app.
-       * app.js reads lms_player_code when it starts.
-       */
-      await window.lmsSwitchPlayer(code);
-
-hideLogin();
-
-setTimeout(function () {
-  addLogoutButton();
-}, 100);
-
-    } catch (err) {
-      console.error(err);
+    if (
+      !/^LMS\d{3}$/.test(
+        code
+      )
+    ) {
 
       error.textContent =
-        "Player code not found. Please check your code.";
+        "Please enter a valid player code, for example LMS001.";
 
-      button.disabled = false;
-      button.textContent = "ENTER THE GAME";
+      return;
+    }
+
+
+    button.disabled =
+      true;
+
+    button.textContent =
+      "LOADING...";
+
+    error.textContent =
+      "";
+
+
+    try {
+
+      /*
+       * The main app now handles the
+       * player data request directly.
+       *
+       * We deliberately do NOT call
+       * checkCode() here.
+       */
+
+      if (
+        typeof window.lmsSwitchPlayer !==
+        "function"
+      ) {
+
+        throw new Error(
+          "Player switching is not ready. Please refresh the app."
+        );
+      }
+
+
+      await window.lmsSwitchPlayer(
+        code
+      );
+
+
+      saveCode(
+        code
+      );
+
+
+      hideLogin();
+
+
+      setTimeout(
+        function () {
+          addLogoutButton();
+        },
+        100
+      );
+
+
+    } catch (err) {
+
+      console.error(
+        "Player login error:",
+        err
+      );
+
+
+      error.textContent =
+        err?.message ||
+        "Player could not be loaded. Please check the code.";
+
+
+      button.disabled =
+        false;
+
+      button.textContent =
+        "ENTER THE GAME";
     }
   }
 
+
+  /* =====================================================
+     CHANGE PLAYER BUTTON
+     ===================================================== */
+
   function addLogoutButton() {
-    const card = document.querySelector(".player-card");
+
+    const card =
+      document.querySelector(
+        ".player-card"
+      );
+
 
     if (!card) {
       return;
     }
 
-    if (document.getElementById("lms-change-player")) {
+
+    if (
+      document.getElementById(
+        "lms-change-player"
+      )
+    ) {
       return;
     }
 
-    const button = document.createElement("button");
 
-    button.id = "lms-change-player";
-    button.textContent = "Change player";
+    const button =
+      document.createElement(
+        "button"
+      );
+
+
+    button.id =
+      "lms-change-player";
+
+    button.textContent =
+      "Change player";
+
 
     button.style.cssText = `
       margin-top:12px;
@@ -267,62 +397,106 @@ setTimeout(function () {
       cursor:pointer;
     `;
 
-    button.addEventListener("click", function () {
-      clearCode();
-      showLogin();
-    });
 
-    card.appendChild(button);
+    button.addEventListener(
+      "click",
+      function () {
+
+        clearCode();
+
+        showLogin();
+      }
+    );
+
+
+    card.appendChild(
+      button
+    );
   }
 
-  async function startLoginSystem() {
-    const savedCode = getSavedCode();
+
+  /* =====================================================
+     START LOGIN SYSTEM
+     ===================================================== */
+
+  function startLoginSystem() {
+
+    const savedCode =
+      getSavedCode();
+
 
     if (!savedCode) {
+
       showLogin();
+
       return;
     }
 
-    try {
-      const player = await checkCode(savedCode);
 
-      if (!player) {
-        clearCode();
-        showLogin();
-        return;
-      }
+    /*
+     * app.js has already loaded the
+     * saved player.
+     *
+     * We simply hide the login screen
+     * and add Change player.
+     */
 
-      hideLogin();
+    hideLogin();
 
-      /*
-       * Give the main app time to render the player card.
-       */
-      setTimeout(function () {
+
+    setTimeout(
+      function () {
         addLogoutButton();
-      }, 1000);
+      },
+      1000
+    );
+  }
 
-    } catch (err) {
-      console.error(err);
+
+  /* =====================================================
+     PUBLIC FUNCTIONS
+     ===================================================== */
+
+  window.lmsShowLogin =
+    showLogin;
+
+
+  window.lmsLogoutPlayer =
+    function () {
 
       clearCode();
 
-      showLogin("Please enter your player code.");
-    }
-  }
+      showLogin();
+    };
 
-  window.lmsShowLogin = showLogin;
 
-  window.lmsLogoutPlayer = function () {
-    clearCode();
-    showLogin();
-  };
+  /* =====================================================
+     START
+     ===================================================== */
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(startLoginSystem, 100);
-    });
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      function () {
+
+        setTimeout(
+          startLoginSystem,
+          100
+        );
+
+      }
+    );
+
   } else {
-    setTimeout(startLoginSystem, 100);
+
+    setTimeout(
+      startLoginSystem,
+      100
+    );
   }
 
 })();
