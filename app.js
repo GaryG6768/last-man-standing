@@ -1208,8 +1208,9 @@ function renderDashboard() {
         ).toUpperCase();
 
   renderRolloverNotice();
+renderNextRoundNotice();
 
-  renderFixtures();
+renderFixtures();
 
   const hint =
     $("selectionHint");
