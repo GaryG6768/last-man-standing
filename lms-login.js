@@ -221,9 +221,13 @@
        * Save the new player code and reload the entire app.
        * app.js reads lms_player_code when it starts.
        */
-      saveCode(code);
+      await window.lmsSwitchPlayer(code);
 
-      window.location.reload();
+hideLogin();
+
+setTimeout(function () {
+  addLogoutButton();
+}, 100);
 
     } catch (err) {
       console.error(err);
