@@ -139,39 +139,8 @@ async function callRpc(name, body) {
 
   return data;
 }
-  const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/rpc/${name}`,
-    {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
-    }
-  );
+  
 
-  const text = await response.text();
-
-  let data = null;
-
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
-  }
-
-  if (!response.ok) {
-    const message =
-      (data && (data.message || data.error || data.hint)) ||
-      `Supabase RPC error ${response.status}`;
-
-    throw new Error(message);
-  }
-
-  return data;
-}
 
 function first(value) {
   return Array.isArray(value) ? value[0] : value;
