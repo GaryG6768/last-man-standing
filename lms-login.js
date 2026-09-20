@@ -304,15 +304,13 @@
       }
 
 
-      window.lmsSwitchPlayer(
-  code
-);
-
-saveCode(
-  code
-);
+      saveCode(code);
 
 hideLogin();
+
+window.lmsSwitchPlayer(code).catch(function (err) {
+  console.error("Player switch error:", err);
+});
 
 
       setTimeout(
