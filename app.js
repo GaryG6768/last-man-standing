@@ -2783,6 +2783,9 @@ function startApp() {
   setupNavigation();
 
   ensureRolloverNotice();
+ensureNextRoundNotice();
+
+loadPlayer(false);
 
   loadPlayer(false);
 
