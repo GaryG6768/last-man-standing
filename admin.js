@@ -179,9 +179,7 @@ function createAdminView() {
 
           <div class="control-grid">
 
-
             <div class="control-item">
-
               <div class="control-label">
                 COMPETITION
               </div>
@@ -192,12 +190,10 @@ function createAdminView() {
               >
                 —
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 STATUS
               </div>
@@ -208,12 +204,10 @@ function createAdminView() {
               >
                 —
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 CURRENT ROUND
               </div>
@@ -224,12 +218,10 @@ function createAdminView() {
               >
                 —
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 ROUND STATUS
               </div>
@@ -240,12 +232,10 @@ function createAdminView() {
               >
                 —
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 SELECTION DEADLINE
               </div>
@@ -256,12 +246,10 @@ function createAdminView() {
               >
                 —
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 PLAYERS
               </div>
@@ -272,12 +260,10 @@ function createAdminView() {
               >
                 —
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 ALIVE
               </div>
@@ -288,12 +274,10 @@ function createAdminView() {
               >
                 —
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 PAID
               </div>
@@ -304,12 +288,10 @@ function createAdminView() {
               >
                 —
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 PRIZE POT
               </div>
@@ -320,12 +302,10 @@ function createAdminView() {
               >
                 £0.00
               </div>
-
             </div>
 
 
             <div class="control-item">
-
               <div class="control-label">
                 ROLLOVER
               </div>
@@ -336,9 +316,7 @@ function createAdminView() {
               >
                 0
               </div>
-
             </div>
-
 
           </div>
 
@@ -349,6 +327,23 @@ function createAdminView() {
           >
             Refresh Competition
           </button>
+
+
+          <button
+            id="lockRoundButton"
+            class="primary-btn"
+            style="margin-top:12px;"
+          >
+            🔒 Lock Round Now
+          </button>
+
+
+          <p
+            id="lockRoundMessage"
+            class="hint"
+          >
+            The round will also lock automatically after the deadline.
+          </p>
 
         </div>
 
@@ -751,8 +746,11 @@ function createAdminNav() {
           "lms_admin_token"
         )
       ) {
+
         loadPlayers();
+
         loadCompetitionControl();
+
       }
 
     }
@@ -837,6 +835,11 @@ function setupAdminControls() {
       "addPlayerButton"
     );
 
+  const lockRound =
+    document.getElementById(
+      "lockRoundButton"
+    );
+
 
   if (login) {
     login.addEventListener(
@@ -892,6 +895,14 @@ function setupAdminControls() {
     addPlayer.addEventListener(
       "click",
       addNewPlayer
+    );
+  }
+
+
+  if (lockRound) {
+    lockRound.addEventListener(
+      "click",
+      adminLockCurrentRound
     );
   }
 
@@ -1221,6 +1232,25 @@ async function loadCompetitionControl() {
         : "—";
 
 
+    const lockButton =
+      document.getElementById(
+        "lockRoundButton"
+      );
+
+
+    if (lockButton) {
+
+      lockButton.dataset.roundId =
+        round?.id || "";
+
+      lockButton.style.display =
+        round?.status === "open"
+          ? ""
+          : "none";
+
+    }
+
+
     document.getElementById(
       "controlDeadline"
     ).textContent =
@@ -1277,10 +1307,12 @@ async function loadCompetitionControl() {
 
 
     if (message) {
+
       message.textContent =
         round
           ? "Current competition information."
           : "There is currently no active round.";
+
     }
 
 
@@ -1310,6 +1342,151 @@ async function loadCompetitionControl() {
         "Refresh Competition";
 
     }
+
+  }
+
+}
+
+
+/* =====================================================
+   MANUAL ROUND LOCK
+   ===================================================== */
+
+async function adminLockCurrentRound() {
+
+  const token =
+    sessionStorage.getItem(
+      "lms_admin_token"
+    );
+
+  const button =
+    document.getElementById(
+      "lockRoundButton"
+    );
+
+  const message =
+    document.getElementById(
+      "lockRoundMessage"
+    );
+
+  const roundId =
+    button?.dataset.roundId || "";
+
+
+  if (!token) {
+
+    if (message) {
+      message.textContent =
+        "Admin session expired. Please log in again.";
+    }
+
+    return;
+  }
+
+
+  if (!roundId) {
+
+    if (message) {
+      message.textContent =
+        "There is no open round available to lock.";
+    }
+
+    return;
+  }
+
+
+  const confirmed =
+    window.confirm(
+      "Lock the current round now? All player selections will be finalised."
+    );
+
+
+  if (!confirmed) {
+    return;
+  }
+
+
+  button.disabled = true;
+
+  button.textContent =
+    "Locking...";
+
+
+  if (message) {
+
+    message.textContent =
+      "Locking round and finalising selections...";
+
+  }
+
+
+  try {
+
+    const raw =
+      await adminCallRpc(
+        "admin_lock_round",
+        {
+          p_session_token:
+            token,
+
+          p_round_id:
+            roundId
+        }
+      );
+
+
+    const result =
+      Array.isArray(raw)
+        ? raw[0]
+        : raw;
+
+
+    if (!result?.success) {
+
+      throw new Error(
+        result?.message ||
+        "Round could not be locked."
+      );
+
+    }
+
+
+    if (message) {
+
+      message.textContent =
+        result.message ||
+        "Round locked successfully.";
+
+    }
+
+
+    await loadCompetitionControl();
+
+
+    await loadPlayers();
+
+
+  } catch (error) {
+
+    console.error(
+      "Manual round lock:",
+      error
+    );
+
+
+    if (message) {
+
+      message.textContent =
+        error?.message ||
+        "Round could not be locked.";
+
+    }
+
+
+    button.disabled = false;
+
+    button.textContent =
+      "🔒 Lock Round Now";
 
   }
 
@@ -1378,7 +1555,9 @@ async function addNewPlayer() {
 
 
   button.disabled = true;
-  button.textContent = "Adding...";
+
+  button.textContent =
+    "Adding...";
 
 
   try {
@@ -1387,7 +1566,8 @@ async function addNewPlayer() {
       await adminCallRpc(
         "admin_get_players",
         {
-          p_session_token:token
+          p_session_token:
+            token
         }
       );
 
@@ -1411,9 +1591,11 @@ async function addNewPlayer() {
         p_competition_id:
           competitionId,
 
-        p_name:name,
+        p_name:
+          name,
 
-        p_player_code:code
+        p_player_code:
+          code
       }
     );
 
@@ -1437,6 +1619,7 @@ async function addNewPlayer() {
       error
     );
 
+
     message.textContent =
       error?.message ||
       "Player could not be added.";
@@ -1445,7 +1628,9 @@ async function addNewPlayer() {
   } finally {
 
     button.disabled = false;
-    button.textContent = "Add Player";
+
+    button.textContent =
+      "Add Player";
 
   }
 
