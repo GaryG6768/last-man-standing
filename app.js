@@ -2,6 +2,24 @@ const SUPABASE_URL = "https://tkhykusvmsceleflynok.supabase.co";
 const SUPABASE_KEY = "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
 let PLAYER_CODE = localStorage.getItem("lms_player_code") || "";
 
+window.lmsSwitchPlayer = async function (code) {
+  PLAYER_CODE = String(code || "").trim().toUpperCase();
+
+  localStorage.setItem(
+    "lms_player_code",
+    PLAYER_CODE
+  );
+
+  state.data = null;
+  state.history = [];
+  state.selectionTeamId = null;
+  state.deadline = null;
+  state.hasLoadedOnce = false;
+  state.lastLoadError = null;
+
+  await loadPlayer(false);
+};
+
 const state = {
   data: null,
   selectionTeamId: null,
