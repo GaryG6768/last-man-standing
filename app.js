@@ -347,6 +347,7 @@ function getTeamNameFromFixture(
    ===================================================== */
 
 function ensureRolloverNotice() {
+
   let notice =
     document.getElementById(
       "rolloverNotice"
@@ -373,6 +374,7 @@ function ensureRolloverNotice() {
     );
 
   if (main) {
+
     main.insertBefore(
       notice,
       main.firstChild
@@ -383,6 +385,7 @@ function ensureRolloverNotice() {
 }
 
 function renderRolloverNotice() {
+
   const notice =
     ensureRolloverNotice();
 
@@ -397,10 +400,12 @@ function renderRolloverNotice() {
     state.data?.competition || {};
 
   if (!isRolloverGame()) {
+
     notice.style.display =
       "none";
 
-    notice.innerHTML = "";
+    notice.innerHTML =
+      "";
 
     return;
   }
@@ -702,20 +707,26 @@ function renderRolloverNotice() {
   `;
 }
 
+
 /* =====================================================
    NEXT ROUND / FIXTURE BREAK NOTICE
    ===================================================== */
 
 function ensureNextRoundNotice() {
+
   let notice =
-    document.getElementById("nextRoundNotice");
+    document.getElementById(
+      "nextRoundNotice"
+    );
 
   if (notice) {
     return notice;
   }
 
   notice =
-    document.createElement("section");
+    document.createElement(
+      "section"
+    );
 
   notice.id =
     "nextRoundNotice";
@@ -724,20 +735,26 @@ function ensureNextRoundNotice() {
     "none";
 
   const main =
-    document.querySelector("main");
+    document.querySelector(
+      "main"
+    );
 
   if (main) {
+
     const rollover =
       document.getElementById(
         "rolloverNotice"
       );
 
     if (rollover) {
+
       main.insertBefore(
         notice,
         rollover.nextSibling
       );
+
     } else {
+
       main.insertBefore(
         notice,
         main.firstChild
@@ -749,6 +766,7 @@ function ensureNextRoundNotice() {
 }
 
 function renderNextRoundNotice() {
+
   const notice =
     ensureNextRoundNotice();
 
@@ -764,7 +782,10 @@ function renderNextRoundNotice() {
       round.start_time || ""
     ).getTime();
 
-  if (!Number.isFinite(start)) {
+  if (
+    !Number.isFinite(start)
+  ) {
+
     notice.style.display =
       "none";
 
@@ -779,10 +800,14 @@ function renderNextRoundNotice() {
     3600000;
 
   /*
-    Only show this when there is a genuine
-    long break between fixture rounds.
+    Only show this for a genuine
+    long fixture break.
   */
-  if (hoursUntil <= 48) {
+
+  if (
+    hoursUntil <= 48
+  ) {
+
     notice.style.display =
       "none";
 
@@ -961,17 +986,21 @@ function renderNextRoundNotice() {
           font-weight:800;
         "
       >
-        Your selection window is open.
+        You don't need to do anything yet.
+        The next round will open automatically.
       </div>
 
     </div>
   `;
 }
+
+
 /* =====================================================
    DASHBOARD
    ===================================================== */
 
 function renderDashboard() {
+
   const d =
     state.data;
 
@@ -1010,30 +1039,39 @@ function renderDashboard() {
     playerStatus ===
     "payment_due"
   ) {
+
     statusText =
       "Payment required";
+
   } else if (
     round.status ===
     "open"
   ) {
+
     statusText =
       "Choose your team";
+
   } else if (
     round.status ===
     "locked"
   ) {
+
     statusText =
       "Selections locked";
+
   } else if (
     round.status ===
     "in_progress"
   ) {
+
     statusText =
       "Round in progress";
+
   } else if (
     round.status ===
     "completed"
   ) {
+
     statusText =
       "Round completed";
   }
@@ -1044,6 +1082,7 @@ function renderDashboard() {
     );
 
   if (heroStatus) {
+
     heroStatus.textContent =
       statusText;
   }
@@ -1107,6 +1146,7 @@ function renderDashboard() {
   if (
     !state.pendingSelection
   ) {
+
     state.selectionTeamId =
       d.selection?.team_id ||
       null;
@@ -1208,9 +1248,10 @@ function renderDashboard() {
         ).toUpperCase();
 
   renderRolloverNotice();
-renderNextRoundNotice();
 
-renderFixtures();
+  renderNextRoundNotice();
+
+  renderFixtures();
 
   const hint =
     $("selectionHint");
@@ -1240,6 +1281,7 @@ renderFixtures();
    ===================================================== */
 
 function renderFixtures() {
+
   const el =
     $("fixtures");
 
@@ -1336,23 +1378,30 @@ function renderFixtures() {
               "PICK";
 
             if (selected) {
+
               label =
                 "SELECTED";
+
             } else if (
               usedAlready
             ) {
+
               label =
                 "USED";
+
             } else if (
               unavailable
             ) {
+
               label =
                 String(
                   fixtureStatus
                 ).toUpperCase();
+
             } else if (
               !open
             ) {
+
               label =
                 "LOCKED";
             }
@@ -2495,6 +2544,7 @@ function renderHistory() {
                     white-space:nowrap;
                   "
                 >
+
                   <span>
                     ${resultIcon(
                       item.result
@@ -2633,6 +2683,9 @@ function setMainView(view) {
   const rolloverNotice =
     ensureRolloverNotice();
 
+  const nextRoundNotice =
+    ensureNextRoundNotice();
+
   const children =
     Array.from(
       main.children
@@ -2656,6 +2709,29 @@ function setMainView(view) {
         child.style.display =
           view === "home" &&
           isRolloverGame()
+            ? ""
+            : "none";
+
+        return;
+      }
+
+      if (
+        child ===
+        nextRoundNotice
+      ) {
+
+        const round =
+          state.data?.current_round || {};
+
+        const start =
+          new Date(
+            round.start_time || ""
+          ).getTime();
+
+        child.style.display =
+          view === "home" &&
+          Number.isFinite(start) &&
+          ((start - Date.now()) / 3600000) > 48
             ? ""
             : "none";
 
@@ -2783,9 +2859,8 @@ function startApp() {
   setupNavigation();
 
   ensureRolloverNotice();
-ensureNextRoundNotice();
 
-loadPlayer(false);
+  ensureNextRoundNotice();
 
   loadPlayer(false);
 
