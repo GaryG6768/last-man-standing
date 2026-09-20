@@ -40,6 +40,105 @@ const $ = (id) => document.getElementById(id);
    ===================================================== */
 
 async function callRpc(name, body) {
+
+  let accessToken = SUPABASE_KEY;
+
+  try {
+
+    if (window.lmsSupabase) {
+
+      const {
+        data
+      } =
+        await window.lmsSupabase.auth.getSession();
+
+      if (
+        data?.session?.access_token
+      ) {
+
+        accessToken =
+          data.session.access_token;
+      }
+    }
+
+  } catch (error) {
+
+    console.warn(
+      "Could not get authenticated session:",
+      error
+    );
+  }
+
+
+  const response =
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/rpc/${name}`,
+      {
+        method: "POST",
+
+        headers: {
+
+          apikey:
+            SUPABASE_KEY,
+
+          Authorization:
+            `Bearer ${accessToken}`,
+
+          "Content-Type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify(
+            body
+          )
+      }
+    );
+
+
+  const text =
+    await response.text();
+
+
+  let data = null;
+
+
+  try {
+
+    data =
+      text
+        ? JSON.parse(text)
+        : null;
+
+  } catch {
+
+    data =
+      text;
+  }
+
+
+  if (!response.ok) {
+
+    const message =
+      (
+        data &&
+        (
+          data.message ||
+          data.error ||
+          data.hint
+        )
+      ) ||
+      `Supabase RPC error ${response.status}`;
+
+
+    throw new Error(
+      message
+    );
+  }
+
+
+  return data;
+}
   const response = await fetch(
     `${SUPABASE_URL}/rest/v1/rpc/${name}`,
     {
