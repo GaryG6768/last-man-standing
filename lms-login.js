@@ -141,14 +141,19 @@
     overlay.style.display = "flex";
 
     const error = document.getElementById("lms-login-error");
+
     if (error) {
       error.textContent = message;
     }
 
     const input = document.getElementById("lms-login-code");
+
     if (input) {
       input.value = getSavedCode();
-      setTimeout(() => input.focus(), 100);
+
+      setTimeout(function () {
+        input.focus();
+      }, 100);
     }
   }
 
@@ -195,7 +200,8 @@
     const code = input.value.trim().toUpperCase();
 
     if (!/^LMS\d{3}$/.test(code)) {
-      error.textContent = "Please enter a valid player code, for example LMS001.";
+      error.textContent =
+        "Please enter a valid player code, for example LMS001.";
       return;
     }
 
@@ -210,30 +216,36 @@
         throw new Error("Player not found");
       }
 
-      window.PLAYER_CODE = code;
+      /*
+       * IMPORTANT:
+       * Save the new player code and reload the entire app.
+       * app.js reads lms_player_code when it starts.
+       */
       saveCode(code);
 
-      hideLogin();
-
-      if (typeof window.loadPlayer === "function") {
-        await window.loadPlayer(false);
-      }
+      window.location.reload();
 
     } catch (err) {
       console.error(err);
-      error.textContent = "Player code not found. Please check your code.";
-    }
 
-    button.disabled = false;
-    button.textContent = "ENTER THE GAME";
+      error.textContent =
+        "Player code not found. Please check your code.";
+
+      button.disabled = false;
+      button.textContent = "ENTER THE GAME";
+    }
   }
 
   function addLogoutButton() {
     const card = document.querySelector(".player-card");
 
-    if (!card) return;
+    if (!card) {
+      return;
+    }
 
-    if (document.getElementById("lms-change-player")) return;
+    if (document.getElementById("lms-change-player")) {
+      return;
+    }
 
     const button = document.createElement("button");
 
@@ -276,20 +288,26 @@
         return;
       }
 
-      window.PLAYER_CODE = savedCode;
       hideLogin();
 
-      setTimeout(addLogoutButton, 1000);
+      /*
+       * Give the main app time to render the player card.
+       */
+      setTimeout(function () {
+        addLogoutButton();
+      }, 1000);
 
     } catch (err) {
       console.error(err);
 
       clearCode();
+
       showLogin("Please enter your player code.");
     }
   }
 
   window.lmsShowLogin = showLogin;
+
   window.lmsLogoutPlayer = function () {
     clearCode();
     showLogin();
@@ -302,4 +320,5 @@
   } else {
     setTimeout(startLoginSystem, 100);
   }
+
 })();
