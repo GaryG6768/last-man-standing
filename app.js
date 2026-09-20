@@ -702,7 +702,271 @@ function renderRolloverNotice() {
   `;
 }
 
+/* =====================================================
+   NEXT ROUND / FIXTURE BREAK NOTICE
+   ===================================================== */
 
+function ensureNextRoundNotice() {
+  let notice =
+    document.getElementById("nextRoundNotice");
+
+  if (notice) {
+    return notice;
+  }
+
+  notice =
+    document.createElement("section");
+
+  notice.id =
+    "nextRoundNotice";
+
+  notice.style.display =
+    "none";
+
+  const main =
+    document.querySelector("main");
+
+  if (main) {
+    const rollover =
+      document.getElementById(
+        "rolloverNotice"
+      );
+
+    if (rollover) {
+      main.insertBefore(
+        notice,
+        rollover.nextSibling
+      );
+    } else {
+      main.insertBefore(
+        notice,
+        main.firstChild
+      );
+    }
+  }
+
+  return notice;
+}
+
+function renderNextRoundNotice() {
+  const notice =
+    ensureNextRoundNotice();
+
+  if (!notice) {
+    return;
+  }
+
+  const round =
+    state.data?.current_round || {};
+
+  const start =
+    new Date(
+      round.start_time || ""
+    ).getTime();
+
+  if (!Number.isFinite(start)) {
+    notice.style.display =
+      "none";
+
+    notice.innerHTML =
+      "";
+
+    return;
+  }
+
+  const hoursUntil =
+    (start - Date.now()) /
+    3600000;
+
+  /*
+    Only show this when there is a genuine
+    long break between fixture rounds.
+  */
+  if (hoursUntil <= 48) {
+    notice.style.display =
+      "none";
+
+    notice.innerHTML =
+      "";
+
+    return;
+  }
+
+  const fixtures =
+    Array.isArray(
+      state.data?.fixtures
+    )
+      ? state.data.fixtures
+          .slice()
+          .sort(
+            (a, b) =>
+              new Date(
+                a.kickoff_time
+              ).getTime() -
+              new Date(
+                b.kickoff_time
+              ).getTime()
+          )
+      : [];
+
+  const firstKickoff =
+    fixtures[0]?.kickoff_time ||
+    round.start_time;
+
+  notice.style.display =
+    "";
+
+  notice.innerHTML = `
+    <div
+      style="
+        background:linear-gradient(
+          135deg,
+          rgba(59,130,246,.12),
+          rgba(255,255,255,.04)
+        );
+        border:1px solid rgba(96,165,250,.22);
+        border-radius:18px;
+        padding:18px;
+        margin-bottom:16px;
+      "
+    >
+
+      <div
+        style="
+          font-size:12px;
+          font-weight:900;
+          letter-spacing:.10em;
+          text-transform:uppercase;
+          color:#93c5fd;
+        "
+      >
+        NEXT ROUND
+      </div>
+
+      <div
+        style="
+          font-size:23px;
+          font-weight:900;
+          margin-top:5px;
+        "
+      >
+        Round ${escapeHtml(
+          round.round_number || ""
+        )}
+      </div>
+
+      <div
+        style="
+          margin-top:8px;
+          font-size:16px;
+          font-weight:700;
+        "
+      >
+        Premier League fixtures return
+      </div>
+
+      <div
+        style="
+          margin-top:7px;
+          opacity:.72;
+          line-height:1.45;
+        "
+      >
+        There is a break before the next
+        round of fixtures.
+      </div>
+
+      <div
+        style="
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:10px;
+          margin-top:15px;
+        "
+      >
+
+        <div
+          style="
+            background:rgba(255,255,255,.05);
+            border-radius:12px;
+            padding:11px;
+          "
+        >
+
+          <div
+            style="
+              font-size:10px;
+              opacity:.6;
+              text-transform:uppercase;
+            "
+          >
+            First fixture
+          </div>
+
+          <div
+            style="
+              font-size:14px;
+              font-weight:800;
+              margin-top:4px;
+            "
+          >
+            ${escapeHtml(
+              formatDate(firstKickoff)
+            )}
+          </div>
+
+        </div>
+
+        <div
+          style="
+            background:rgba(255,255,255,.05);
+            border-radius:12px;
+            padding:11px;
+          "
+        >
+
+          <div
+            style="
+              font-size:10px;
+              opacity:.6;
+              text-transform:uppercase;
+            "
+          >
+            Selection deadline
+          </div>
+
+          <div
+            style="
+              font-size:14px;
+              font-weight:800;
+              margin-top:4px;
+            "
+          >
+            ${escapeHtml(
+              formatDate(
+                round.selection_deadline
+              )
+            )}
+          </div>
+
+        </div>
+
+      </div>
+
+      <div
+        style="
+          margin-top:14px;
+          color:#93c5fd;
+          font-size:13px;
+          font-weight:800;
+        "
+      >
+        Your selection window is open.
+      </div>
+
+    </div>
+  `;
+}
 /* =====================================================
    DASHBOARD
    ===================================================== */
