@@ -1,6 +1,6 @@
 const SUPABASE_URL = "https://tkhykusvmsceleflynok.supabase.co";
 const SUPABASE_KEY = "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
-const PLAYER_CODE = "GARY";
+let PLAYER_CODE = localStorage.getItem("lms_player_code") || "";
 
 const state = {
   data: null,
