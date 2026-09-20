@@ -2958,8 +2958,10 @@ function setupNavigation() {
    START APP
    ===================================================== */
 
-function startApp() {
-
+async function startApp() {
+  if (window.lmsAuthReady) {
+    await window.lmsAuthReady;
+  }
   const confirmBtn =
     $("confirmBtn");
 
