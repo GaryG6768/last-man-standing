@@ -1802,6 +1802,28 @@ function renderPlayers(players) {
           );
 
 
+        /*
+         * The backend now supplies the correct
+         * entry fee for this player.
+         *
+         * Normal game:
+         *   £5
+         *
+         * Rollover:
+         *   Existing player = £5
+         *   New player = rollover new-player fee
+         *
+         * Use 5 as a safe fallback for older
+         * player records.
+         */
+
+        const entryFee =
+          Number(
+            player.rollover_entry_fee ??
+            5
+          );
+
+
         const statusLabel =
           formatPlayerStatus(
             status
@@ -1814,8 +1836,9 @@ function renderPlayers(players) {
               <button
                 class="primary-btn mark-paid-btn"
                 data-player-id="${player.id}"
+                data-payment-amount="${entryFee.toFixed(2)}"
               >
-                MARK PAID £5
+                MARK PAID £${entryFee.toFixed(2)}
               </button>
             `
             : "";
@@ -1955,9 +1978,16 @@ async function markPlayerPaid(
   button
 ) {
 
+  const paymentAmount =
+    Number(
+      button?.dataset.paymentAmount ||
+      5
+    );
+
+
   const confirmed =
     window.confirm(
-      "Mark this player as PAID and record the £5 entry payment?"
+      `Mark this player as PAID and record the £${paymentAmount.toFixed(2)} entry payment?`
     );
 
 
@@ -2024,7 +2054,7 @@ async function markPlayerPaid(
     button.disabled = false;
 
     button.textContent =
-      "MARK PAID £5";
+      `MARK PAID £${paymentAmount.toFixed(2)}`;
 
   }
 
