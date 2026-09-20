@@ -1327,22 +1327,29 @@
 
 
       const identity =
-        await restoreExistingSession();
+  await restoreExistingSession();
 
+const savedCode =
+  getSavedCode();
 
-      const savedCode =
-        getSavedCode();
+if (
+  identity &&
+  identity.passkey_enrolled === true
+) {
 
+  hideLogin();
 
-      if (identity) {
+  return true;
+}
 
-        hideLogin();
+if (identity) {
 
-        return true;
-      }
+  await supabaseClient.auth.signOut({
+    scope: "local"
+  });
+}
 
-
-      showLogin();
+showLogin();
 
 
       setLoginMessage(
