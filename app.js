@@ -40,6 +40,7 @@ async function callRpc(name, body) {
     const message =
       (data && (data.message || data.error || data.hint)) ||
       `Supabase RPC error ${response.status}`;
+
     throw new Error(message);
   }
 
@@ -323,7 +324,6 @@ function renderDashboard() {
     null;
 
   /*
-    Important:
     If the player has picked a new team but hasn't
     confirmed it yet, don't let the background refresh
     overwrite that choice.
@@ -783,11 +783,6 @@ async function saveSelection() {
       );
     }
 
-    /*
-      The selection has now been saved to Supabase.
-      Clear the pending flag so future refreshes use
-      the saved selection.
-    */
     state.pendingSelection =
       false;
 
@@ -821,17 +816,11 @@ async function saveSelection() {
   }
 }
 
-/*
-  LOAD PLAYER
 
-  This version is designed to prevent the problem where
-  the app suddenly changes to "Failed to fetch".
+/* =====================================================
+   LOAD PLAYER
+   ===================================================== */
 
-  It tries the connection up to 3 times.
-
-  If the app has already loaded successfully, a temporary
-  connection failure will NOT replace the working screen.
-*/
 async function loadPlayer(
   silent = false
 ) {
@@ -853,10 +842,6 @@ async function loadPlayer(
     let lastError =
       null;
 
-    /*
-      Retry temporary mobile/Supabase
-      connection drops.
-    */
     for (
       let attempt = 0;
       attempt < 3;
@@ -920,9 +905,6 @@ async function loadPlayer(
       );
     }
 
-    /*
-      Successful connection.
-    */
     state.data =
       data;
 
@@ -944,15 +926,6 @@ async function loadPlayer(
     state.lastLoadError =
       error;
 
-    /*
-      IMPORTANT:
-
-      If the app has already loaded once,
-      DO NOT replace the working screen.
-
-      The automatic 30-second refresh will
-      try again.
-    */
     if (
       state.hasLoadedOnce &&
       state.data
@@ -961,10 +934,6 @@ async function loadPlayer(
       return;
     }
 
-    /*
-      Only show the full connection error
-      if the very first load failed.
-    */
     $("playerName")
       .textContent =
       "Connection error";
@@ -1158,6 +1127,8 @@ function ensureHistoryView() {
 
       </div>
 
+      <div id="historySummary"></div>
+
       <div id="historyContent">
 
         <div class="empty-state">
@@ -1257,7 +1228,222 @@ function resultStyle(result) {
     return "color:#fcd34a;";
   }
 
+  if (
+    value === "abandoned"
+  ) {
+    return "color:#c4b5fd;";
+  }
+
   return "color:#cbd5e1;";
+}
+
+function resultIcon(result) {
+
+  const value =
+    String(
+      result ||
+      ""
+    ).toLowerCase();
+
+  if (
+    value === "win" ||
+    value === "through"
+  ) {
+    return "✓";
+  }
+
+  if (
+    value === "loss"
+  ) {
+    return "✕";
+  }
+
+  if (
+    value === "draw"
+  ) {
+    return "—";
+  }
+
+  if (
+    value === "abandoned"
+  ) {
+    return "↻";
+  }
+
+  return "•";
+}
+
+function escapeHtml(value) {
+
+  return String(
+    value ?? ""
+  )
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderHistorySummary() {
+
+  const summary =
+    document.getElementById(
+      "historySummary"
+    );
+
+  if (!summary) {
+    return;
+  }
+
+  const history =
+    Array.isArray(
+      state.history
+    )
+      ? state.history
+      : [];
+
+  if (
+    !history.length
+  ) {
+
+    summary.innerHTML =
+      "";
+
+    return;
+  }
+
+  const wins =
+    history.filter(
+      (item) =>
+        ["win", "through"].includes(
+          String(
+            item.result || ""
+          ).toLowerCase()
+        )
+    ).length;
+
+  const losses =
+    history.filter(
+      (item) =>
+        String(
+          item.result || ""
+        ).toLowerCase() ===
+        "loss"
+    ).length;
+
+  const automatic =
+    history.filter(
+      (item) =>
+        String(
+          item.selection_type || ""
+        ).toLowerCase() ===
+        "automatic"
+    ).length;
+
+  summary.innerHTML =
+    `
+      <div
+        style="
+          display:grid;
+          grid-template-columns:repeat(3,1fr);
+          gap:10px;
+          margin:14px 0 18px;
+        "
+      >
+
+        <div
+          style="
+            background:rgba(255,255,255,0.04);
+            border:1px solid rgba(255,255,255,0.08);
+            border-radius:14px;
+            padding:12px;
+            text-align:center;
+          "
+        >
+          <div
+            style="
+              font-size:22px;
+              font-weight:800;
+            "
+          >
+            ${wins}
+          </div>
+
+          <div
+            style="
+              font-size:11px;
+              opacity:.65;
+              text-transform:uppercase;
+              margin-top:3px;
+            "
+          >
+            Through
+          </div>
+        </div>
+
+        <div
+          style="
+            background:rgba(255,255,255,0.04);
+            border:1px solid rgba(255,255,255,0.08);
+            border-radius:14px;
+            padding:12px;
+            text-align:center;
+          "
+        >
+          <div
+            style="
+              font-size:22px;
+              font-weight:800;
+            "
+          >
+            ${losses}
+          </div>
+
+          <div
+            style="
+              font-size:11px;
+              opacity:.65;
+              text-transform:uppercase;
+              margin-top:3px;
+            "
+          >
+            Losses
+          </div>
+        </div>
+
+        <div
+          style="
+            background:rgba(255,255,255,0.04);
+            border:1px solid rgba(255,255,255,0.08);
+            border-radius:14px;
+            padding:12px;
+            text-align:center;
+          "
+        >
+          <div
+            style="
+              font-size:22px;
+              font-weight:800;
+            "
+          >
+            ${automatic}
+          </div>
+
+          <div
+            style="
+              font-size:11px;
+              opacity:.65;
+              text-transform:uppercase;
+              margin-top:3px;
+            "
+          >
+            Automatic
+          </div>
+        </div>
+
+      </div>
+    `;
 }
 
 function renderHistory() {
@@ -1281,14 +1467,47 @@ function renderHistory() {
       ? state.history
       : [];
 
+  renderHistorySummary();
+
   if (
     !history.length
   ) {
 
     content.innerHTML =
       `
-        <div class="empty-state">
-          No completed rounds yet.
+        <div
+          class="empty-state"
+          style="
+            padding:30px 10px;
+            text-align:center;
+          "
+        >
+          <div
+            style="
+              font-size:34px;
+              margin-bottom:10px;
+            "
+          >
+            🏆
+          </div>
+
+          <div
+            style="
+              font-weight:800;
+              font-size:17px;
+            "
+          >
+            Your journey starts here
+          </div>
+
+          <div
+            style="
+              opacity:.65;
+              margin-top:7px;
+            "
+          >
+            Your completed rounds will appear here.
+          </div>
         </div>
       `;
 
@@ -1317,48 +1536,115 @@ function renderHistory() {
               item.result
             );
 
+          const resultColour =
+            resultStyle(
+              item.result
+            );
+
+          const icon =
+            resultIcon(
+              item.result
+            );
+
           const kickoff =
             formatDate(
               item.kickoff_time
             );
 
+          const selectionType =
+            String(
+              item.selection_type ||
+              "manual"
+            ).toLowerCase();
+
+          const automatic =
+            selectionType ===
+            "automatic";
+
           let score =
             "";
 
           if (
-            item.home_score !==
-              null &&
-            item.home_score !==
-              undefined &&
-            item.away_score !==
-              null &&
-            item.away_score !==
-              undefined
+            item.home_score !== null &&
+            item.home_score !== undefined &&
+            item.away_score !== null &&
+            item.away_score !== undefined
           ) {
 
             score =
               `
                 <div
                   style="
-                    font-size:20px;
-                    font-weight:800;
-                    margin-top:6px;
+                    font-size:26px;
+                    font-weight:900;
+                    margin-top:10px;
+                    letter-spacing:.04em;
                   "
                 >
-                  ${item.home_score}
+                  ${escapeHtml(
+                    item.home_score
+                  )}
                   -
-                  ${item.away_score}
+                  ${escapeHtml(
+                    item.away_score
+                  )}
                 </div>
               `;
           }
+
+          const selectionBadge =
+            automatic
+              ?
+              `
+                <div
+                  style="
+                    display:inline-flex;
+                    align-items:center;
+                    gap:6px;
+                    margin-top:10px;
+                    padding:6px 10px;
+                    border-radius:999px;
+                    background:rgba(251,191,36,.12);
+                    border:1px solid rgba(251,191,36,.25);
+                    color:#fcd34d;
+                    font-size:11px;
+                    font-weight:800;
+                    text-transform:uppercase;
+                    letter-spacing:.04em;
+                  "
+                >
+                  ⚠ Automatic selection
+                </div>
+              `
+              :
+              `
+                <div
+                  style="
+                    display:inline-flex;
+                    align-items:center;
+                    margin-top:10px;
+                    padding:6px 10px;
+                    border-radius:999px;
+                    background:rgba(255,255,255,.05);
+                    border:1px solid rgba(255,255,255,.08);
+                    color:#cbd5e1;
+                    font-size:11px;
+                    font-weight:700;
+                    text-transform:uppercase;
+                    letter-spacing:.04em;
+                  "
+                >
+                  Your selection
+                </div>
+              `;
 
           return `
             <div
               style="
                 background:rgba(255,255,255,0.04);
                 border:1px solid rgba(255,255,255,0.08);
-                border-radius:16px;
-                padding:16px;
+                border-radius:18px;
+                padding:17px;
                 margin-bottom:12px;
               "
             >
@@ -1367,7 +1653,7 @@ function renderHistory() {
                 style="
                   display:flex;
                   justify-content:space-between;
-                  align-items:center;
+                  align-items:flex-start;
                   gap:12px;
                 "
               >
@@ -1376,60 +1662,80 @@ function renderHistory() {
 
                   <div
                     style="
-                      font-size:12px;
+                      font-size:11px;
                       text-transform:uppercase;
-                      letter-spacing:0.08em;
-                      opacity:0.65;
+                      letter-spacing:.1em;
+                      opacity:.6;
+                      font-weight:700;
                     "
                   >
-                    ROUND ${roundNumber}
+                    ROUND ${escapeHtml(
+                      roundNumber
+                    )}
                   </div>
 
                   <div
                     style="
-                      font-size:18px;
-                      font-weight:800;
-                      margin-top:4px;
+                      font-size:19px;
+                      font-weight:900;
+                      margin-top:5px;
                     "
                   >
-                    ${teamName}
+                    ${escapeHtml(
+                      teamName
+                    )}
                   </div>
 
                 </div>
 
                 <div
                   style="
-                    font-weight:800;
-                    font-size:13px;
-                    ${resultStyle(
-                      item.result
-                    )}
+                    display:flex;
+                    align-items:center;
+                    gap:5px;
+                    font-weight:900;
+                    font-size:14px;
+                    ${resultColour}
+                    white-space:nowrap;
                   "
                 >
-                  ${result}
+                  <span>
+                    ${icon}
+                  </span>
+
+                  <span>
+                    ${result}
+                  </span>
                 </div>
 
               </div>
 
               <div
                 style="
-                  margin-top:12px;
-                  font-weight:600;
+                  margin-top:14px;
+                  font-weight:700;
+                  font-size:15px;
                 "
               >
-                ${fixture}
+                ${escapeHtml(
+                  fixture
+                )}
               </div>
 
               ${score}
 
+              ${selectionBadge}
+
               <div
                 style="
-                  margin-top:8px;
-                  font-size:13px;
-                  opacity:0.6;
+                  margin-top:10px;
+                  font-size:12px;
+                  opacity:.55;
                 "
               >
-                ${kickoff}
+                ${escapeHtml(
+                  kickoff
+                )}
               </div>
 
             </div>
@@ -1498,8 +1804,10 @@ async function loadHistory() {
             <br><br>
 
             ${
-              error?.message ||
-              "Please try again."
+              escapeHtml(
+                error?.message ||
+                "Please try again."
+              )
             }
 
           </div>
@@ -1669,12 +1977,6 @@ function startApp() {
     1000
   );
 
-  /*
-    Background refresh every 30 seconds.
-
-    If Supabase temporarily fails, the new loadPlayer()
-    keeps the existing working dashboard on screen.
-  */
   setInterval(
     () => loadPlayer(true),
     30000
