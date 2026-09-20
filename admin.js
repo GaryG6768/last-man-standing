@@ -76,6 +76,8 @@ function createAdminView() {
     </div>
 
 
+    <!-- LOGIN -->
+
     <div id="adminLoginPanel">
 
       <p class="hint">
@@ -123,6 +125,8 @@ function createAdminView() {
     </div>
 
 
+    <!-- DASHBOARD -->
+
     <div
       id="adminDashboard"
       style="display:none;"
@@ -144,6 +148,209 @@ function createAdminView() {
         <p class="hint">
           Competition management area.
         </p>
+
+      </div>
+
+
+      <!-- COMPETITION CONTROL -->
+
+      <div class="admin-panel">
+
+        <div class="muted">
+          COMPETITION CONTROL
+        </div>
+
+        <h2>
+          Current Competition
+        </h2>
+
+        <div
+          id="competitionControlMessage"
+          class="hint"
+        >
+          Loading competition...
+        </div>
+
+
+        <div
+          id="competitionControl"
+          style="display:none;"
+        >
+
+          <div class="control-grid">
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                COMPETITION
+              </div>
+
+              <div
+                id="controlCompetitionName"
+                class="control-value"
+              >
+                —
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                STATUS
+              </div>
+
+              <div
+                id="controlCompetitionStatus"
+                class="control-value"
+              >
+                —
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                CURRENT ROUND
+              </div>
+
+              <div
+                id="controlRound"
+                class="control-value"
+              >
+                —
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                ROUND STATUS
+              </div>
+
+              <div
+                id="controlRoundStatus"
+                class="control-value"
+              >
+                —
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                SELECTION DEADLINE
+              </div>
+
+              <div
+                id="controlDeadline"
+                class="control-value"
+              >
+                —
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                PLAYERS
+              </div>
+
+              <div
+                id="controlPlayers"
+                class="control-value"
+              >
+                —
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                ALIVE
+              </div>
+
+              <div
+                id="controlAlive"
+                class="control-value"
+              >
+                —
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                PAID
+              </div>
+
+              <div
+                id="controlPaid"
+                class="control-value"
+              >
+                —
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                PRIZE POT
+              </div>
+
+              <div
+                id="controlPrizePot"
+                class="control-value"
+              >
+                £0.00
+              </div>
+
+            </div>
+
+
+            <div class="control-item">
+
+              <div class="control-label">
+                ROLLOVER
+              </div>
+
+              <div
+                id="controlRollover"
+                class="control-value"
+              >
+                0
+              </div>
+
+            </div>
+
+
+          </div>
+
+
+          <button
+            id="refreshCompetitionButton"
+            class="primary-btn"
+          >
+            Refresh Competition
+          </button>
+
+        </div>
 
       </div>
 
@@ -400,6 +607,39 @@ function addAdminStyles() {
       margin-top:15px;
     }
 
+    .control-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:16px;
+    }
+
+    .control-item {
+      padding:13px;
+      border-radius:14px;
+      background:rgba(255,255,255,0.035);
+      border:1px solid rgba(255,255,255,0.06);
+    }
+
+    .control-label {
+      font-size:10px;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+      opacity:.5;
+    }
+
+    .control-value {
+      margin-top:5px;
+      font-size:15px;
+      font-weight:700;
+    }
+
+    @media (max-width:380px) {
+      .control-grid {
+        grid-template-columns:1fr;
+      }
+    }
+
   `;
 
 
@@ -505,6 +745,16 @@ function createAdminNav() {
 
       showAdminDashboard();
 
+
+      if (
+        sessionStorage.getItem(
+          "lms_admin_token"
+        )
+      ) {
+        loadPlayers();
+        loadCompetitionControl();
+      }
+
     }
   );
 
@@ -577,6 +827,11 @@ function setupAdminControls() {
       "refreshPlayersButton"
     );
 
+  const refreshCompetition =
+    document.getElementById(
+      "refreshCompetitionButton"
+    );
+
   const addPlayer =
     document.getElementById(
       "addPlayerButton"
@@ -621,6 +876,14 @@ function setupAdminControls() {
     refresh.addEventListener(
       "click",
       loadPlayers
+    );
+  }
+
+
+  if (refreshCompetition) {
+    refreshCompetition.addEventListener(
+      "click",
+      loadCompetitionControl
     );
   }
 
@@ -718,6 +981,8 @@ async function adminLogin() {
     showAdminDashboard();
 
     await loadPlayers();
+
+    await loadCompetitionControl();
 
 
   } catch (error) {
@@ -836,6 +1101,222 @@ function adminLogout() {
 
 
 /* =====================================================
+   COMPETITION CONTROL
+   ===================================================== */
+
+async function loadCompetitionControl() {
+
+  const token =
+    sessionStorage.getItem(
+      "lms_admin_token"
+    );
+
+
+  if (!token) {
+    return;
+  }
+
+
+  const message =
+    document.getElementById(
+      "competitionControlMessage"
+    );
+
+  const panel =
+    document.getElementById(
+      "competitionControl"
+    );
+
+  const refresh =
+    document.getElementById(
+      "refreshCompetitionButton"
+    );
+
+
+  if (message) {
+    message.textContent =
+      "Loading competition...";
+  }
+
+
+  if (panel) {
+    panel.style.display = "none";
+  }
+
+
+  if (refresh) {
+    refresh.disabled = true;
+    refresh.textContent =
+      "Loading...";
+  }
+
+
+  try {
+
+    const raw =
+      await adminCallRpc(
+        "admin_get_competition_control",
+        {
+          p_session_token:
+            token
+        }
+      );
+
+
+    const result =
+      Array.isArray(raw)
+        ? raw[0]
+        : raw;
+
+
+    if (!result?.success) {
+
+      throw new Error(
+        result?.message ||
+        "Unable to load competition."
+      );
+
+    }
+
+
+    const competition =
+      result.competition || {};
+
+    const round =
+      result.round;
+
+    const players =
+      result.players || {};
+
+
+    document.getElementById(
+      "controlCompetitionName"
+    ).textContent =
+      competition.name || "—";
+
+
+    document.getElementById(
+      "controlCompetitionStatus"
+    ).textContent =
+      formatCompetitionStatus(
+        competition.status
+      );
+
+
+    document.getElementById(
+      "controlRound"
+    ).textContent =
+      round
+        ? `Round ${round.round_number}`
+        : "No active round";
+
+
+    document.getElementById(
+      "controlRoundStatus"
+    ).textContent =
+      round
+        ? formatRoundStatus(
+            round.status
+          )
+        : "—";
+
+
+    document.getElementById(
+      "controlDeadline"
+    ).textContent =
+      round
+        ? formatAdminDateTime(
+            round.selection_deadline
+          )
+        : "—";
+
+
+    document.getElementById(
+      "controlPlayers"
+    ).textContent =
+      Number(
+        players.total || 0
+      );
+
+
+    document.getElementById(
+      "controlAlive"
+    ).textContent =
+      Number(
+        players.alive || 0
+      );
+
+
+    document.getElementById(
+      "controlPaid"
+    ).textContent =
+      Number(
+        players.paid || 0
+      );
+
+
+    document.getElementById(
+      "controlPrizePot"
+    ).textContent =
+      `£${Number(
+        competition.prize_pot || 0
+      ).toFixed(2)}`;
+
+
+    document.getElementById(
+      "controlRollover"
+    ).textContent =
+      Number(
+        competition.rollover_number || 0
+      );
+
+
+    if (panel) {
+      panel.style.display = "";
+    }
+
+
+    if (message) {
+      message.textContent =
+        round
+          ? "Current competition information."
+          : "There is currently no active round.";
+    }
+
+
+  } catch (error) {
+
+    console.error(
+      "Competition control:",
+      error
+    );
+
+
+    if (message) {
+
+      message.textContent =
+        error?.message ||
+        "Unable to load competition.";
+
+    }
+
+  } finally {
+
+    if (refresh) {
+
+      refresh.disabled = false;
+
+      refresh.textContent =
+        "Refresh Competition";
+
+    }
+
+  }
+
+}
+
+
+/* =====================================================
    ADD PLAYER
    ===================================================== */
 
@@ -916,9 +1397,11 @@ async function addNewPlayer() {
 
 
     if (!competitionId) {
+
       throw new Error(
         "Could not determine the competition."
       );
+
     }
 
 
@@ -944,6 +1427,8 @@ async function addNewPlayer() {
 
 
     await loadPlayers();
+
+    await loadCompetitionControl();
 
 
   } catch (error) {
@@ -1006,8 +1491,12 @@ async function loadPlayers() {
 
 
   if (refresh) {
+
     refresh.disabled = true;
-    refresh.textContent = "Loading...";
+
+    refresh.textContent =
+      "Loading...";
+
   }
 
 
@@ -1017,7 +1506,8 @@ async function loadPlayers() {
       await adminCallRpc(
         "admin_get_players",
         {
-          p_session_token:token
+          p_session_token:
+            token
         }
       );
 
@@ -1029,10 +1519,12 @@ async function loadPlayers() {
 
 
     if (!result?.success) {
+
       throw new Error(
         result?.message ||
         "Unable to load players."
       );
+
     }
 
 
@@ -1057,6 +1549,7 @@ async function loadPlayers() {
       error
     );
 
+
     message.textContent =
       error?.message ||
       "Unable to load players.";
@@ -1065,9 +1558,12 @@ async function loadPlayers() {
   } finally {
 
     if (refresh) {
+
       refresh.disabled = false;
+
       refresh.textContent =
         "Refresh Players";
+
     }
 
   }
@@ -1240,8 +1736,6 @@ function renderPlayers(players) {
     .join("");
 
 
-  /* Mark Paid buttons */
-
   list
     .querySelectorAll(
       ".mark-paid-btn"
@@ -1288,6 +1782,7 @@ async function markPlayerPaid(
 
 
   button.disabled = true;
+
   button.textContent =
     "MARKING PAID...";
 
@@ -1325,6 +1820,8 @@ async function markPlayerPaid(
 
     await loadPlayers();
 
+    await loadCompetitionControl();
+
 
   } catch (error) {
 
@@ -1350,7 +1847,7 @@ async function markPlayerPaid(
 
 
 /* =====================================================
-   HELPERS
+   STATUS HELPERS
    ===================================================== */
 
 function formatPlayerStatus(status) {
@@ -1389,6 +1886,87 @@ function formatPlayerStatus(status) {
 }
 
 
+function formatCompetitionStatus(status) {
+
+  const labels = {
+
+    setup:
+      "SETUP",
+
+    active:
+      "ACTIVE",
+
+    paused:
+      "PAUSED",
+
+    rollover:
+      "ROLLOVER",
+
+    complete:
+      "COMPLETE"
+
+  };
+
+
+  const value =
+    String(
+      status ||
+      "unknown"
+    ).toLowerCase();
+
+
+  return (
+    labels[value] ||
+    value.toUpperCase()
+  );
+
+}
+
+
+function formatRoundStatus(status) {
+
+  const labels = {
+
+    upcoming:
+      "UPCOMING",
+
+    open:
+      "OPEN",
+
+    locked:
+      "LOCKED",
+
+    in_progress:
+      "IN PROGRESS",
+
+    completed:
+      "COMPLETED",
+
+    abandoned:
+      "ABANDONED"
+
+  };
+
+
+  const value =
+    String(
+      status ||
+      "unknown"
+    ).toLowerCase();
+
+
+  return (
+    labels[value] ||
+    value.toUpperCase()
+  );
+
+}
+
+
+/* =====================================================
+   DATE HELPERS
+   ===================================================== */
+
 function formatAdminDate(value) {
 
   if (!value) {
@@ -1420,6 +1998,44 @@ function formatAdminDate(value) {
 
 }
 
+
+function formatAdminDateTime(value) {
+
+  if (!value) {
+    return "—";
+  }
+
+
+  const date =
+    new Date(value);
+
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "—";
+  }
+
+
+  return date.toLocaleString(
+    "en-GB",
+    {
+      day:"2-digit",
+      month:"short",
+      year:"numeric",
+      hour:"2-digit",
+      minute:"2-digit"
+    }
+  );
+
+}
+
+
+/* =====================================================
+   HTML SAFETY
+   ===================================================== */
 
 function escapeAdminHtml(value) {
 
