@@ -971,3 +971,354 @@ function renderPlayers(players) {
                   "
                 >
                   Joined
+                </div>
+
+                <div
+                  style="
+                    margin-top:3px;
+                    font-weight:600;
+                  "
+                >
+                  ${formatAdminDate(
+                    player.joined_at
+                  )}
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        `;
+
+      }
+    )
+    .join("");
+
+}
+
+
+/* =====================================================
+   PLAYER STATUS
+   ===================================================== */
+
+function formatPlayerStatus(status) {
+
+  const values = {
+
+    paid:
+      "🟢 PAID",
+
+    alive:
+      "🟢 ALIVE",
+
+    payment_due:
+      "🟠 PAYMENT DUE",
+
+    eliminated:
+      "🔴 ELIMINATED",
+
+    winner:
+      "🏆 WINNER",
+
+    paused:
+      "⏸ PAUSED",
+
+    removed:
+      "⚫ REMOVED"
+
+  };
+
+
+  return (
+    values[status] ||
+    status.toUpperCase()
+  );
+
+}
+
+
+/* =====================================================
+   DATE FORMAT
+   ===================================================== */
+
+function formatAdminDate(value) {
+
+  if (!value) {
+    return "—";
+  }
+
+
+  const date =
+    new Date(value);
+
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "—";
+  }
+
+
+  return date.toLocaleDateString(
+    "en-GB",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    }
+  );
+
+}
+
+
+/* =====================================================
+   ESCAPE HTML
+   ===================================================== */
+
+function escapeAdminHtml(value) {
+
+  return String(
+    value ?? ""
+  )
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+
+}
+
+
+/* =====================================================
+   LOGOUT
+   ===================================================== */
+
+function adminLogout() {
+
+  sessionStorage.removeItem(
+    "lms_admin_token"
+  );
+
+
+  showAdminDashboard();
+
+}
+
+
+/* =====================================================
+   ADMIN NAVIGATION
+   ===================================================== */
+
+function setupAdminNavigation() {
+
+  const nav =
+    document.querySelector(
+      ".bottom-nav"
+    );
+
+
+  if (!nav) {
+    return;
+  }
+
+
+  if (
+    document.getElementById(
+      "adminNavButton"
+    )
+  ) {
+    return;
+  }
+
+
+  const button =
+    document.createElement(
+      "button"
+    );
+
+
+  button.id =
+    "adminNavButton";
+
+  button.className =
+    "nav-item";
+
+
+  button.innerHTML = `
+
+    <span>
+      ⚙
+    </span>
+
+    <small>
+      Admin
+    </small>
+
+  `;
+
+
+  nav.appendChild(
+    button
+  );
+
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      document
+        .querySelectorAll(
+          ".nav-item"
+        )
+        .forEach(
+          item =>
+            item.classList.remove(
+              "active"
+            )
+        );
+
+
+      button.classList.add(
+        "active"
+      );
+
+
+      const main =
+        document.querySelector(
+          "main"
+        );
+
+
+      if (main) {
+
+        Array.from(
+          main.children
+        )
+        .forEach(
+          child => {
+
+            child.style.display =
+              "none";
+
+          }
+        );
+
+      }
+
+
+      const history =
+        document.getElementById(
+          "historyView"
+        );
+
+
+      if (history) {
+
+        history.style.display =
+          "none";
+
+      }
+
+
+      const adminView =
+        document.getElementById(
+          "adminView"
+        );
+
+
+      if (adminView) {
+
+        adminView.style.display =
+          "";
+
+      }
+
+
+      showAdminDashboard();
+
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+
+    }
+  );
+
+
+  document
+    .querySelectorAll(
+      ".nav-item"
+    )
+    .forEach(
+      item => {
+
+        if (
+          item === button
+        ) {
+          return;
+        }
+
+
+        item.addEventListener(
+          "click",
+          () => {
+
+            const adminView =
+              document.getElementById(
+                "adminView"
+              );
+
+
+            if (
+              adminView
+            ) {
+
+              adminView.style.display =
+                "none";
+
+            }
+
+          }
+        );
+
+      }
+    );
+
+}
+
+
+/* =====================================================
+   START ADMIN
+   ===================================================== */
+
+function startAdmin() {
+
+  createAdminView();
+
+  setupAdminNavigation();
+
+  showAdminDashboard();
+
+}
+
+
+if (
+  document.readyState ===
+  "loading"
+) {
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    startAdmin
+  );
+
+} else {
+
+  startAdmin();
+
+}
