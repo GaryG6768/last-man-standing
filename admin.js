@@ -9,7 +9,12 @@ const ADMIN_SUPABASE_KEY =
   "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
 
 
+/* =====================================================
+   SUPABASE RPC
+   ===================================================== */
+
 async function adminCallRpc(name, body) {
+
   const response = await fetch(
     `${ADMIN_SUPABASE_URL}/rest/v1/rpc/${name}`,
     {
@@ -24,7 +29,8 @@ async function adminCallRpc(name, body) {
   );
 
   const text = await response.text();
-  let data = null;
+
+  let data;
 
   try {
     data = text ? JSON.parse(text) : null;
@@ -45,18 +51,23 @@ async function adminCallRpc(name, body) {
 
 
 /* =====================================================
-   ADMIN VIEW
+   CREATE ADMIN VIEW
    ===================================================== */
 
 function createAdminView() {
-  if (document.getElementById("adminView")) return;
+
+  if (document.getElementById("adminView")) {
+    return;
+  }
 
   const view = document.createElement("section");
+
   view.id = "adminView";
   view.className = "rules-card";
   view.style.display = "none";
 
   view.innerHTML = `
+
     <div class="section-title">
       <div>
         <span class="muted">ADMINISTRATION</span>
@@ -64,7 +75,9 @@ function createAdminView() {
       </div>
     </div>
 
+
     <div id="adminLoginPanel">
+
       <p class="hint">
         Enter your 6-digit Admin PIN to access the management area.
       </p>
@@ -84,7 +97,7 @@ function createAdminView() {
           border-radius:16px;
           border:1px solid rgba(255,255,255,0.12);
           background:#0b1220;
-          color:#ffffff;
+          color:#fff;
           font-size:26px;
           letter-spacing:8px;
           text-align:center;
@@ -100,88 +113,67 @@ function createAdminView() {
         Login
       </button>
 
-      <p class="hint" id="adminMessage">
+      <p
+        class="hint"
+        id="adminMessage"
+      >
         Admin access is protected.
       </p>
+
     </div>
 
-    <div id="adminDashboard" style="display:none;">
 
-      <div style="
-        background:rgba(255,255,255,0.04);
-        border:1px solid rgba(255,255,255,0.08);
-        border-radius:18px;
-        padding:20px;
-      ">
-        <div style="
-          font-size:12px;
-          text-transform:uppercase;
-          letter-spacing:.08em;
-          opacity:.65;
-        ">
+    <div
+      id="adminDashboard"
+      style="display:none;"
+    >
+
+
+      <!-- ADMIN HEADER -->
+
+      <div class="admin-panel">
+
+        <div class="muted">
           ADMINISTRATOR
         </div>
 
-        <h2 style="margin:6px 0 0;">
+        <h2>
           Admin Dashboard
         </h2>
 
         <p class="hint">
           Competition management area.
         </p>
+
       </div>
 
 
-      <!-- =================================================
-           ADD PLAYER
-           ================================================= -->
+      <!-- ADD PLAYER -->
 
-      <div style="
-        margin-top:18px;
-        background:rgba(255,255,255,0.04);
-        border:1px solid rgba(255,255,255,0.08);
-        border-radius:18px;
-        padding:20px;
-      ">
+      <div class="admin-panel">
 
-        <div>
-          <div style="
-            font-size:12px;
-            text-transform:uppercase;
-            letter-spacing:.08em;
-            opacity:.65;
-          ">
-            PLAYER MANAGEMENT
-          </div>
-
-          <h2 style="margin:6px 0 0;">
-            Add Player
-          </h2>
-
-          <p class="hint" style="margin-top:8px;">
-            Add a player to this competition.
-            New players start as PAYMENT DUE.
-          </p>
+        <div class="muted">
+          PLAYER MANAGEMENT
         </div>
+
+        <h2>
+          Add Player
+        </h2>
+
+        <p class="hint">
+          Add a player to this competition.
+          New players start as PAYMENT DUE.
+        </p>
+
 
         <input
           id="newPlayerName"
           type="text"
           autocomplete="off"
           placeholder="Player name"
-          style="
-            width:100%;
-            box-sizing:border-box;
-            padding:16px;
-            margin-top:14px;
-            border-radius:14px;
-            border:1px solid rgba(255,255,255,0.12);
-            background:#0b1220;
-            color:#ffffff;
-            font-size:17px;
-            outline:none;
-          "
+          class="admin-input"
         >
+
 
         <input
           id="newPlayerCode"
@@ -189,32 +181,21 @@ function createAdminView() {
           autocomplete="off"
           autocapitalize="characters"
           placeholder="Player code e.g. JOHN"
-          style="
-            width:100%;
-            box-sizing:border-box;
-            padding:16px;
-            margin-top:10px;
-            border-radius:14px;
-            border:1px solid rgba(255,255,255,0.12);
-            background:#0b1220;
-            color:#ffffff;
-            font-size:17px;
-            outline:none;
-          "
+          class="admin-input"
         >
+
 
         <button
           id="addPlayerButton"
           class="primary-btn"
-          style="margin-top:12px;"
         >
           Add Player
         </button>
 
+
         <p
           id="addPlayerMessage"
           class="hint"
-          style="margin-top:10px;"
         >
           Enter the player's name and code.
         </p>
@@ -222,66 +203,50 @@ function createAdminView() {
       </div>
 
 
-      <!-- =================================================
-           PLAYERS
-           ================================================= -->
+      <!-- PLAYERS -->
 
-      <div style="
-        margin-top:18px;
-        background:rgba(255,255,255,0.04);
-        border:1px solid rgba(255,255,255,0.08);
-        border-radius:18px;
-        padding:20px;
-      ">
+      <div class="admin-panel">
 
-        <div style="
-          display:flex;
-          justify-content:space-between;
-          align-items:center;
-          gap:12px;
-        ">
+        <div class="admin-panel-heading">
 
           <div>
-            <div style="
-              font-size:12px;
-              text-transform:uppercase;
-              letter-spacing:.08em;
-              opacity:.65;
-            ">
+
+            <div class="muted">
               COMPETITION
             </div>
 
-            <h2 style="margin:6px 0 0;">
+            <h2>
               Players
             </h2>
+
           </div>
 
-          <div id="playerCount" style="
-            font-size:22px;
-            font-weight:700;
-          ">
+          <strong
+            id="playerCount"
+            style="font-size:24px;"
+          >
             —
-          </div>
+          </strong>
 
         </div>
+
 
         <p
           id="playersMessage"
           class="hint"
-          style="margin-top:10px;"
         >
           Loading players...
         </p>
 
+
         <div
           id="playersList"
-          style="margin-top:16px;"
         ></div>
+
 
         <button
           id="refreshPlayersButton"
           class="primary-btn"
-          style="margin-top:16px;"
         >
           Refresh Players
         </button>
@@ -289,20 +254,19 @@ function createAdminView() {
       </div>
 
 
-      <!-- =================================================
-           LOGOUT
-           ================================================= -->
+      <!-- LOGOUT -->
 
       <button
         id="adminLogoutButton"
         class="primary-btn"
-        style="margin-top:18px;"
       >
         Log out
       </button>
 
     </div>
+
   `;
+
 
   const shell =
     document.querySelector(".app-shell");
@@ -310,11 +274,136 @@ function createAdminView() {
   const nav =
     document.querySelector(".bottom-nav");
 
+
   if (shell && nav) {
     shell.insertBefore(view, nav);
   }
 
+
+  addAdminStyles();
+
   setupAdminControls();
+}
+
+
+/* =====================================================
+   ADMIN STYLES
+   ===================================================== */
+
+function addAdminStyles() {
+
+  if (
+    document.getElementById(
+      "adminExtraStyles"
+    )
+  ) {
+    return;
+  }
+
+
+  const style =
+    document.createElement("style");
+
+  style.id =
+    "adminExtraStyles";
+
+
+  style.textContent = `
+
+    .admin-panel {
+      margin-top:18px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:18px;
+      padding:20px;
+    }
+
+    .admin-panel-heading {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+
+    .admin-input {
+      width:100%;
+      box-sizing:border-box;
+      padding:16px;
+      margin-top:10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:#0b1220;
+      color:#fff;
+      font-size:17px;
+      outline:none;
+    }
+
+    .admin-panel > .primary-btn {
+      margin-top:12px;
+    }
+
+    .admin-player {
+      padding:16px;
+      margin-bottom:12px;
+      border-radius:16px;
+      background:rgba(255,255,255,0.035);
+      border:1px solid rgba(255,255,255,0.07);
+    }
+
+    .admin-player-top {
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+    }
+
+    .admin-player-name {
+      font-size:18px;
+      font-weight:700;
+    }
+
+    .admin-player-code {
+      margin-top:4px;
+      font-size:13px;
+      opacity:.6;
+    }
+
+    .admin-status {
+      padding:7px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.07);
+      font-size:12px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+
+    .admin-stats {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin-top:15px;
+    }
+
+    .admin-stat-label {
+      font-size:11px;
+      text-transform:uppercase;
+      opacity:.5;
+    }
+
+    .admin-stat-value {
+      margin-top:3px;
+      font-weight:600;
+    }
+
+    .mark-paid-btn {
+      width:100%;
+      margin-top:15px;
+    }
+
+  `;
+
+
+  document.head.appendChild(style);
 }
 
 
@@ -325,16 +414,27 @@ function createAdminView() {
 function createAdminNav() {
 
   const nav =
-    document.querySelector(".bottom-nav");
+    document.querySelector(
+      ".bottom-nav"
+    );
 
-  if (!nav) return;
+  if (!nav) {
+    return;
+  }
+
 
   if (
-    document.getElementById("adminNavButton")
-  ) return;
+    document.getElementById(
+      "adminNavButton"
+    )
+  ) {
+    return;
+  }
+
 
   const button =
     document.createElement("button");
+
 
   button.id =
     "adminNavButton";
@@ -342,10 +442,12 @@ function createAdminNav() {
   button.className =
     "nav-item";
 
+
   button.innerHTML = `
     <span>⚙</span>
     <small>Admin</small>
   `;
+
 
   button.addEventListener(
     "click",
@@ -356,10 +458,16 @@ function createAdminNav() {
           "adminView"
         );
 
-      if (!adminView) return;
+      if (!adminView) {
+        return;
+      }
+
 
       const main =
-        document.querySelector("main");
+        document.querySelector(
+          "main"
+        );
+
 
       if (main) {
 
@@ -374,12 +482,9 @@ function createAdminNav() {
 
       }
 
+
       adminView.style.display = "";
 
-      adminView.scrollIntoView({
-        behavior:"smooth",
-        block:"start"
-      });
 
       document
         .querySelectorAll(
@@ -392,54 +497,57 @@ function createAdminNav() {
             )
         );
 
+
       button.classList.add(
         "active"
       );
+
 
       showAdminDashboard();
 
     }
   );
 
-  nav.appendChild(
-    button
-  );
 
-  const normalButtons =
-    nav.querySelectorAll(
+  nav.appendChild(button);
+
+
+  nav
+    .querySelectorAll(
       ".nav-item"
-    );
+    )
+    .forEach(
+      item => {
 
-  normalButtons.forEach(
-    item => {
+        if (item === button) {
+          return;
+        }
 
-      if (
-        item === button
-      ) return;
 
-      item.addEventListener(
-        "click",
-        () => {
+        item.addEventListener(
+          "click",
+          () => {
 
-          const adminView =
-            document.getElementById(
-              "adminView"
+            const adminView =
+              document.getElementById(
+                "adminView"
+              );
+
+            if (adminView) {
+              adminView.style.display =
+                "none";
+            }
+
+
+            button.classList.remove(
+              "active"
             );
 
-          if (adminView) {
-            adminView.style.display =
-              "none";
           }
+        );
 
-          button.classList.remove(
-            "active"
-          );
-
-        }
-      );
-
-    }
-  );
+      }
+    );
 }
 
 
@@ -449,14 +557,14 @@ function createAdminNav() {
 
 function setupAdminControls() {
 
-  const pin =
-    document.getElementById(
-      "adminPin"
-    );
-
   const login =
     document.getElementById(
       "adminLoginButton"
+    );
+
+  const pin =
+    document.getElementById(
+      "adminPin"
     );
 
   const logout =
@@ -474,12 +582,14 @@ function setupAdminControls() {
       "addPlayerButton"
     );
 
+
   if (login) {
     login.addEventListener(
       "click",
       adminLogin
     );
   }
+
 
   if (pin) {
 
@@ -498,6 +608,7 @@ function setupAdminControls() {
 
   }
 
+
   if (logout) {
     logout.addEventListener(
       "click",
@@ -505,12 +616,14 @@ function setupAdminControls() {
     );
   }
 
+
   if (refresh) {
     refresh.addEventListener(
       "click",
       loadPlayers
     );
   }
+
 
   if (addPlayer) {
     addPlayer.addEventListener(
@@ -543,33 +656,25 @@ async function adminLogin() {
       "adminMessage"
     );
 
-  if (
-    !pin ||
-    !button ||
-    !message
-  ) return;
 
   const value =
-    pin.value.trim();
+    pin?.value.trim() || "";
+
 
   if (
-    !/^[0-9]{6}$/.test(
-      value
-    )
+    !/^[0-9]{6}$/.test(value)
   ) {
 
     message.textContent =
       "Please enter your 6-digit Admin PIN.";
 
     return;
-
   }
 
-  button.disabled =
-    true;
 
-  button.textContent =
-    "Checking...";
+  button.disabled = true;
+  button.textContent = "Checking...";
+
 
   try {
 
@@ -581,10 +686,12 @@ async function adminLogin() {
         }
       );
 
+
     const result =
       Array.isArray(raw)
         ? raw[0]
         : raw;
+
 
     if (
       !result?.success ||
@@ -598,25 +705,24 @@ async function adminLogin() {
 
     }
 
+
     sessionStorage.setItem(
       "lms_admin_token",
       result.session_token
     );
 
-    pin.value =
-      "";
 
-    message.textContent =
-      "Admin login successful.";
+    pin.value = "";
+
 
     showAdminDashboard();
 
     await loadPlayers();
 
+
   } catch (error) {
 
     console.error(
-      "Admin login:",
       error
     );
 
@@ -624,14 +730,62 @@ async function adminLogin() {
       error?.message ||
       "Admin login failed.";
 
+
   } finally {
 
-    button.disabled =
-      false;
+    button.disabled = false;
+    button.textContent = "Login";
 
-    button.textContent =
-      "Login";
+  }
 
+}
+
+
+/* =====================================================
+   SHOW DASHBOARD
+   ===================================================== */
+
+function showAdminDashboard() {
+
+  const loggedIn =
+    !!sessionStorage.getItem(
+      "lms_admin_token"
+    );
+
+
+  const loginPanel =
+    document.getElementById(
+      "adminLoginPanel"
+    );
+
+  const dashboard =
+    document.getElementById(
+      "adminDashboard"
+    );
+
+  const title =
+    document.getElementById(
+      "adminTitle"
+    );
+
+
+  if (loginPanel) {
+    loginPanel.style.display =
+      loggedIn ? "none" : "";
+  }
+
+
+  if (dashboard) {
+    dashboard.style.display =
+      loggedIn ? "" : "none";
+  }
+
+
+  if (title) {
+    title.textContent =
+      loggedIn
+        ? "Admin Dashboard"
+        : "Admin Login";
   }
 
 }
@@ -647,121 +801,35 @@ function adminLogout() {
     "lms_admin_token"
   );
 
+
+  const dashboard =
+    document.getElementById(
+      "adminDashboard"
+    );
+
+  const loginPanel =
+    document.getElementById(
+      "adminLoginPanel"
+    );
+
   const adminView =
     document.getElementById(
       "adminView"
     );
 
+
+  if (dashboard) {
+    dashboard.style.display = "none";
+  }
+
+
+  if (loginPanel) {
+    loginPanel.style.display = "";
+  }
+
+
   if (adminView) {
-    adminView.style.display =
-      "none";
-  }
-
-  const loginPanel =
-    document.getElementById(
-      "adminLoginPanel"
-    );
-
-  const dashboard =
-    document.getElementById(
-      "adminDashboard"
-    );
-
-  const title =
-    document.getElementById(
-      "adminTitle"
-    );
-
-  const message =
-    document.getElementById(
-      "adminMessage"
-    );
-
-  if (loginPanel) {
-    loginPanel.style.display =
-      "";
-  }
-
-  if (dashboard) {
-    dashboard.style.display =
-      "none";
-  }
-
-  if (title) {
-    title.textContent =
-      "Admin Login";
-  }
-
-  if (message) {
-    message.textContent =
-      "Admin access is protected.";
-  }
-
-  const adminButton =
-    document.getElementById(
-      "adminNavButton"
-    );
-
-  if (adminButton) {
-    adminButton.classList.remove(
-      "active"
-    );
-  }
-
-}
-
-
-/* =====================================================
-   SHOW ADMIN DASHBOARD
-   ===================================================== */
-
-function showAdminDashboard() {
-
-  const loggedIn =
-    !!sessionStorage.getItem(
-      "lms_admin_token"
-    );
-
-  const loginPanel =
-    document.getElementById(
-      "adminLoginPanel"
-    );
-
-  const dashboard =
-    document.getElementById(
-      "adminDashboard"
-    );
-
-  const title =
-    document.getElementById(
-      "adminTitle"
-    );
-
-  if (loginPanel) {
-
-    loginPanel.style.display =
-      loggedIn
-        ? "none"
-        : "";
-
-  }
-
-  if (dashboard) {
-
-    dashboard.style.display =
-      loggedIn
-        ? ""
-        : "none";
-
-  }
-
-  if (title) {
-
-    title.textContent =
-      loggedIn
-        ? "Admin Dashboard"
-        : "Admin Login";
-
+    adminView.style.display = "none";
   }
 
 }
@@ -793,77 +861,44 @@ async function addNewPlayer() {
       "addPlayerMessage"
     );
 
+
   const token =
     sessionStorage.getItem(
       "lms_admin_token"
     );
 
-  if (!token) {
-
-    if (message) {
-      message.textContent =
-        "Please log in again.";
-    }
-
-    return;
-
-  }
 
   const name =
-    nameInput?.value.trim() ||
-    "";
+    nameInput?.value.trim() || "";
+
 
   const code =
     codeInput?.value
       .trim()
-      .toUpperCase() ||
-    "";
+      .toUpperCase() || "";
+
 
   if (!name) {
 
     message.textContent =
       "Please enter the player's name.";
 
-    nameInput?.focus();
-
     return;
-
   }
+
 
   if (!code) {
 
     message.textContent =
       "Please enter a player code.";
 
-    codeInput?.focus();
-
     return;
-
   }
 
-  if (
-    !/^[A-Z0-9_-]{2,20}$/.test(
-      code
-    )
-  ) {
 
-    message.textContent =
-      "Player code must be 2-20 characters using letters, numbers, - or _.";
+  button.disabled = true;
+  button.textContent = "Adding...";
 
-    codeInput?.focus();
-
-    return;
-
-  }
-
-  button.disabled =
-    true;
-
-  button.textContent =
-    "Adding...";
-
-  message.textContent =
-    "Adding player...";
 
   try {
 
@@ -871,69 +906,49 @@ async function addNewPlayer() {
       await adminCallRpc(
         "admin_get_players",
         {
-          p_session_token:
-            token
+          p_session_token:token
         }
       );
+
 
     const competitionId =
       adminInfo?.competition_id;
 
-    if (!competitionId) {
 
+    if (!competitionId) {
       throw new Error(
         "Could not determine the competition."
       );
-
     }
 
-    const raw =
-      await adminCallRpc(
-        "admin_add_player",
-        {
-          p_competition_id:
-            competitionId,
 
-          p_name:
-            name,
+    await adminCallRpc(
+      "admin_add_player",
+      {
+        p_competition_id:
+          competitionId,
 
-          p_player_code:
-            code
-        }
-      );
+        p_name:name,
 
-    const result =
-      Array.isArray(raw)
-        ? raw[0]
-        : raw;
+        p_player_code:code
+      }
+    );
 
-    if (
-      result &&
-      result.success === false
-    ) {
 
-      throw new Error(
-        result.message ||
-        "Player could not be added."
-      );
+    nameInput.value = "";
+    codeInput.value = "";
 
-    }
-
-    nameInput.value =
-      "";
-
-    codeInput.value =
-      "";
 
     message.textContent =
       "Player added successfully. Payment is now due.";
 
+
     await loadPlayers();
+
 
   } catch (error) {
 
     console.error(
-      "Add player:",
       error
     );
 
@@ -941,13 +956,11 @@ async function addNewPlayer() {
       error?.message ||
       "Player could not be added.";
 
+
   } finally {
 
-    button.disabled =
-      false;
-
-    button.textContent =
-      "Add Player";
+    button.disabled = false;
+    button.textContent = "Add Player";
 
   }
 
@@ -965,14 +978,15 @@ async function loadPlayers() {
       "lms_admin_token"
     );
 
+
+  if (!token) {
+    return;
+  }
+
+
   const message =
     document.getElementById(
       "playersMessage"
-    );
-
-  const list =
-    document.getElementById(
-      "playersList"
     );
 
   const count =
@@ -980,27 +994,22 @@ async function loadPlayers() {
       "playerCount"
     );
 
+  const list =
+    document.getElementById(
+      "playersList"
+    );
+
   const refresh =
     document.getElementById(
       "refreshPlayersButton"
     );
 
-  if (!token) return;
-
-  if (message) {
-    message.textContent =
-      "Loading players...";
-  }
 
   if (refresh) {
-
-    refresh.disabled =
-      true;
-
-    refresh.textContent =
-      "Loading...";
-
+    refresh.disabled = true;
+    refresh.textContent = "Loading...";
   }
+
 
   try {
 
@@ -1008,79 +1017,57 @@ async function loadPlayers() {
       await adminCallRpc(
         "admin_get_players",
         {
-          p_session_token:
-            token
+          p_session_token:token
         }
       );
+
 
     const result =
       Array.isArray(raw)
         ? raw[0]
         : raw;
 
-    if (!result?.success) {
 
+    if (!result?.success) {
       throw new Error(
         result?.message ||
         "Unable to load players."
       );
-
     }
+
 
     const players =
-      result.players ||
-      [];
+      result.players || [];
 
-    if (count) {
 
-      count.textContent =
-        players.length;
+    count.textContent =
+      players.length;
 
-    }
 
-    if (message) {
+    message.textContent =
+      `${players.length} players in this competition.`;
 
-      message.textContent =
-        players.length === 1
-          ? "1 player in this competition."
-          : `${players.length} players in this competition.`;
 
-    }
+    renderPlayers(players);
 
-    renderPlayers(
-      players
-    );
 
   } catch (error) {
 
     console.error(
-      "Load players:",
       error
     );
 
-    if (message) {
+    message.textContent =
+      error?.message ||
+      "Unable to load players.";
 
-      message.textContent =
-        error?.message ||
-        "Unable to load players.";
-
-    }
-
-    if (list) {
-      list.innerHTML =
-        "";
-    }
 
   } finally {
 
     if (refresh) {
-
-      refresh.disabled =
-        false;
-
+      refresh.disabled = false;
       refresh.textContent =
         "Refresh Players";
-
     }
 
   }
@@ -1092,221 +1079,281 @@ async function loadPlayers() {
    RENDER PLAYERS
    ===================================================== */
 
-function renderPlayers(
-  players
-) {
+function renderPlayers(players) {
 
   const list =
     document.getElementById(
       "playersList"
     );
 
-  if (!list) return;
 
-  if (!players.length) {
-
-    list.innerHTML = `
-      <div style="
-        padding:20px;
-        text-align:center;
-        border-radius:14px;
-        background:rgba(255,255,255,0.03);
-        color:rgba(255,255,255,0.55);
-      ">
-        No players found.
-      </div>
-    `;
-
+  if (!list) {
     return;
-
   }
 
+
   list.innerHTML =
-    players
-      .map(
-        player => {
+    players.map(
+      player => {
 
-          const status =
+        const status =
+          String(
             player.status ||
-            "unknown";
+            "unknown"
+          ).toLowerCase();
 
-          const payment =
-            player.paid_amount != null
-              ? `£${Number(
-                  player.paid_amount
-                ).toFixed(2)}`
-              : "—";
 
-          const missed =
-            Number(
-              player.missed_selection_count ||
-              0
-            );
+        const payment =
+          `£${Number(
+            player.paid_amount || 0
+          ).toFixed(2)}`;
 
-          const rollover =
-            Number(
-              player.rollover_number ||
-              0
-            );
 
-          return `
-            <div style="
-              padding:16px;
-              margin-bottom:10px;
-              border-radius:16px;
-              background:rgba(255,255,255,0.035);
-              border:1px solid rgba(255,255,255,0.07);
-            ">
+        const missed =
+          Number(
+            player.missed_selection_count || 0
+          );
 
-              <div style="
-                display:flex;
-                justify-content:space-between;
-                align-items:flex-start;
-                gap:12px;
-              ">
 
-                <div>
+        const rollover =
+          Number(
+            player.rollover_number || 0
+          );
 
-                  <div style="
-                    font-size:18px;
-                    font-weight:700;
-                  ">
-                    ${escapeAdminHtml(
-                      player.name
-                    )}
-                  </div>
 
-                  <div style="
-                    margin-top:4px;
-                    font-size:13px;
-                    opacity:.6;
-                  ">
-                    Code:
-                    ${escapeAdminHtml(
-                      player.player_code ||
-                      "—"
-                    )}
-                  </div>
+        const statusLabel =
+          formatPlayerStatus(
+            status
+          );
 
+
+        const markPaid =
+          status === "payment_due"
+            ? `
+              <button
+                class="primary-btn mark-paid-btn"
+                data-player-id="${player.id}"
+              >
+                MARK PAID £5
+              </button>
+            `
+            : "";
+
+
+        return `
+
+          <div class="admin-player">
+
+            <div class="admin-player-top">
+
+              <div>
+
+                <div class="admin-player-name">
+                  ${escapeAdminHtml(
+                    player.name
+                  )}
                 </div>
 
-                <div style="
-                  padding:6px 10px;
-                  border-radius:999px;
-                  background:rgba(255,255,255,0.07);
-                  font-size:12px;
-                  font-weight:700;
-                  white-space:nowrap;
-                ">
-                  ${formatPlayerStatus(
-                    status
+                <div class="admin-player-code">
+                  Code:
+                  ${escapeAdminHtml(
+                    player.player_code
                   )}
                 </div>
 
               </div>
 
-              <div style="
-                display:grid;
-                grid-template-columns:1fr 1fr;
-                gap:10px;
-                margin-top:14px;
-              ">
 
-                <div>
-                  <div style="
-                    font-size:11px;
-                    text-transform:uppercase;
-                    opacity:.5;
-                  ">
-                    Payment
-                  </div>
+              <div class="admin-status">
+                ${statusLabel}
+              </div>
 
-                  <div style="
-                    margin-top:3px;
-                    font-weight:600;
-                  ">
-                    ${payment}
-                  </div>
+            </div>
+
+
+            <div class="admin-stats">
+
+              <div>
+
+                <div class="admin-stat-label">
+                  Payment
                 </div>
 
-                <div>
-                  <div style="
-                    font-size:11px;
-                    text-transform:uppercase;
-                    opacity:.5;
-                  ">
-                    Missed
-                  </div>
-
-                  <div style="
-                    margin-top:3px;
-                    font-weight:600;
-                  ">
-                    ${missed}
-                  </div>
+                <div class="admin-stat-value">
+                  ${payment}
                 </div>
 
-                <div>
-                  <div style="
-                    font-size:11px;
-                    text-transform:uppercase;
-                    opacity:.5;
-                  ">
-                    Rollover
-                  </div>
+              </div>
 
-                  <div style="
-                    margin-top:3px;
-                    font-weight:600;
-                  ">
-                    ${rollover}
-                  </div>
+
+              <div>
+
+                <div class="admin-stat-label">
+                  Missed
                 </div>
 
-                <div>
-                  <div style="
-                    font-size:11px;
-                    text-transform:uppercase;
-                    opacity:.5;
-                  ">
-                    Joined
-                  </div>
+                <div class="admin-stat-value">
+                  ${missed}
+                </div>
 
-                  <div style="
-                    margin-top:3px;
-                    font-weight:600;
-                  ">
-                    ${formatAdminDate(
-                      player.joined_at
-                    )}
-                  </div>
+              </div>
+
+
+              <div>
+
+                <div class="admin-stat-label">
+                  Rollover
+                </div>
+
+                <div class="admin-stat-value">
+                  ${rollover}
+                </div>
+
+              </div>
+
+
+              <div>
+
+                <div class="admin-stat-label">
+                  Joined
+                </div>
+
+                <div class="admin-stat-value">
+                  ${formatAdminDate(
+                    player.joined_at
+                  )}
                 </div>
 
               </div>
 
             </div>
-          `;
 
-        }
-      )
-      .join("");
+
+            ${markPaid}
+
+          </div>
+
+        `;
+
+      }
+    )
+    .join("");
+
+
+  /* Mark Paid buttons */
+
+  list
+    .querySelectorAll(
+      ".mark-paid-btn"
+    )
+    .forEach(
+      button => {
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            markPlayerPaid(
+              button.dataset.playerId,
+              button
+            );
+
+          }
+        );
+
+      }
+    );
 
 }
 
 
 /* =====================================================
-   STATUS
+   MARK PLAYER PAID
    ===================================================== */
 
-function formatPlayerStatus(
-  status
+async function markPlayerPaid(
+  playerId,
+  button
 ) {
 
-  const value =
-    String(
-      status ||
-      "unknown"
-    ).toLowerCase();
+  const confirmed =
+    window.confirm(
+      "Mark this player as PAID and record the £5 entry payment?"
+    );
+
+
+  if (!confirmed) {
+    return;
+  }
+
+
+  button.disabled = true;
+  button.textContent =
+    "MARKING PAID...";
+
+
+  try {
+
+    const raw =
+      await adminCallRpc(
+        "admin_mark_paid",
+        {
+          p_player_id:
+            playerId
+        }
+      );
+
+
+    const result =
+      Array.isArray(raw)
+        ? raw[0]
+        : raw;
+
+
+    if (
+      result &&
+      result.success === false
+    ) {
+
+      throw new Error(
+        result.message ||
+        "Payment could not be recorded."
+      );
+
+    }
+
+
+    await loadPlayers();
+
+
+  } catch (error) {
+
+    console.error(
+      error
+    );
+
+
+    alert(
+      error?.message ||
+      "Payment could not be recorded."
+    );
+
+
+    button.disabled = false;
+
+    button.textContent =
+      "MARK PAID £5";
+
+  }
+
+}
+
+
+/* =====================================================
+   HELPERS
+   ===================================================== */
+
+function formatPlayerStatus(status) {
 
   const labels = {
 
@@ -1333,28 +1380,25 @@ function formatPlayerStatus(
 
   };
 
+
   return (
-    labels[value] ||
-    value.toUpperCase()
+    labels[status] ||
+    status.toUpperCase()
   );
 
 }
 
 
-/* =====================================================
-   DATE
-   ===================================================== */
+function formatAdminDate(value) {
 
-function formatAdminDate(
-  value
-) {
+  if (!value) {
+    return "—";
+  }
 
-  if (!value) return "—";
 
   const date =
-    new Date(
-      value
-    );
+    new Date(value);
+
 
   if (
     Number.isNaN(
@@ -1363,6 +1407,7 @@ function formatAdminDate(
   ) {
     return "—";
   }
+
 
   return date.toLocaleDateString(
     "en-GB",
@@ -1376,37 +1421,16 @@ function formatAdminDate(
 }
 
 
-/* =====================================================
-   ESCAPE HTML
-   ===================================================== */
-
-function escapeAdminHtml(
-  value
-) {
+function escapeAdminHtml(value) {
 
   return String(
     value ?? ""
   )
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-    .replace(
-      /</g,
-      "&lt;"
-    )
-    .replace(
-      />/g,
-      "&gt;"
-    )
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-    .replace(
-      /'/g,
-      "&#039;"
-    );
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 }
 
@@ -1421,15 +1445,7 @@ function startAdmin() {
 
   createAdminNav();
 
-  if (
-    sessionStorage.getItem(
-      "lms_admin_token"
-    )
-  ) {
-
-    showAdminDashboard();
-
-  }
+  showAdminDashboard();
 
 }
 
