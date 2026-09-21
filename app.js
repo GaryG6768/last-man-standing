@@ -1,1078 +1,451 @@
-const SUPABASE_URL = "https://tkhykusvmsceleflynok.supabase.co";
-const SUPABASE_KEY = "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
-let PLAYER_CODE = localStorage.getItem("lms_player_code") || "";
+const SUPABASE_URL="https://tkhykusvmsceleflynok.supabase.co";
+const SUPABASE_KEY="sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
+let PLAYER_CODE=localStorage.getItem("lms_player_code")||"";
 
-window.lmsSwitchPlayer = async function (code) {
-  PLAYER_CODE = String(code || "").trim().toUpperCase();
+const state={
+  data:null,
+  history:[],
+  selectionTeamId:null,
+  deadline:null,
+  activeView:"home",
+  isLoading:false,
+  hasLoadedOnce:false,
+  pendingSelection:false,
+  lastLoadError:null
+};
 
-  localStorage.setItem(
-    "lms_player_code",
-    PLAYER_CODE
-  );
+const $=id=>document.getElementById(id);
 
-  state.data = null;
-  state.history = [];
-  state.selectionTeamId = null;
-  state.deadline = null;
-  state.hasLoadedOnce = false;
-  state.lastLoadError = null;
-
+window.lmsSwitchPlayer=async code=>{
+  PLAYER_CODE=String(code||"").trim().toUpperCase();
+  localStorage.setItem("lms_player_code",PLAYER_CODE);
+  state.data=null;
+  state.history=[];
+  state.selectionTeamId=null;
+  state.deadline=null;
+  state.hasLoadedOnce=false;
+  state.lastLoadError=null;
+  state.pendingSelection=false;
   await loadPlayer(false);
 };
 
-const state = {
-  data: null,
-  selectionTeamId: null,
-  deadline: null,
-  history: [],
-  activeView: "home",
-  isLoading: false,
-  hasLoadedOnce: false,
-  pendingSelection: false,
-  lastLoadError: null
-};
+async function callRpc(name,body){
+  let token=SUPABASE_KEY;
 
-const $ = (id) => document.getElementById(id);
+  try{
+    if(window.lmsSupabase){
+      const {data}=await window.lmsSupabase.auth.getSession();
 
-
-/* =====================================================
-   SUPABASE
-   ===================================================== */
-
-async function callRpc(name, body) {
-
-  let accessToken = SUPABASE_KEY;
-
-  try {
-
-    if (window.lmsSupabase) {
-
-      const {
-        data
-      } =
-        await window.lmsSupabase.auth.getSession();
-
-      if (
-        data?.session?.access_token
-      ) {
-
-        accessToken =
-          data.session.access_token;
+      if(data?.session?.access_token){
+        token=data.session.access_token;
       }
     }
-
-  } catch (error) {
-
-    console.warn(
-      "Could not get authenticated session:",
-      error
-    );
+  }catch(e){
+    console.warn("Session error",e);
   }
 
+  const r=await fetch(
+    `${SUPABASE_URL}/rest/v1/rpc/${name}`,
+    {
+      method:"POST",
+      headers:{
+        apikey:SUPABASE_KEY,
+        Authorization:`Bearer ${token}`,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify(body)
+    }
+  );
 
-  const response =
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/rpc/${name}`,
-      {
-        method: "POST",
+  const text=await r.text();
 
-        headers: {
+  let data=null;
 
-          apikey:
-            SUPABASE_KEY,
-
-          Authorization:
-            `Bearer ${accessToken}`,
-
-          "Content-Type":
-            "application/json"
-        },
-
-        body:
-          JSON.stringify(
-            body
-          )
-      }
-    );
-
-
-  const text =
-    await response.text();
-
-
-  let data = null;
-
-
-  try {
-
-    data =
-      text
-        ? JSON.parse(text)
-        : null;
-
-  } catch {
-
-    data =
-      text;
+  try{
+    data=text?JSON.parse(text):null;
+  }catch{
+    data=text;
   }
 
-
-  if (!response.ok) {
-
-    const message =
-      (
-        data &&
-        (
-          data.message ||
-          data.error ||
-          data.hint
-        )
-      ) ||
-      `Supabase RPC error ${response.status}`;
-
-
+  if(!r.ok){
     throw new Error(
-      message
+      data?.message||
+      data?.error||
+      data?.hint||
+      `Supabase RPC error ${r.status}`
     );
   }
-
 
   return data;
 }
-  
 
+const first=v=>Array.isArray(v)?v[0]:v;
 
-function first(value) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function money(value) {
-  const n = Number(value);
-
-  return Number.isFinite(n)
-    ? `£${n.toFixed(2)}`
+const money=v=>
+  Number.isFinite(Number(v))
+    ? `£${Number(v).toFixed(2)}`
     : "£5.00";
-}
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+const esc=v=>
+  String(v??"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 
+function formatDate(v){
+  if(!v)return"";
 
-/* =====================================================
-   DATES
-   ===================================================== */
+  const d=new Date(v);
 
-function formatDate(value) {
-  if (!value) return "";
+  if(Number.isNaN(d.getTime()))return"";
 
-  const d = new Date(value);
-
-  if (Number.isNaN(d.getTime())) {
-    return "";
-  }
-
-  return d.toLocaleString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-function deadlinePassed() {
-  if (!state.deadline) {
-    return false;
-  }
-
-  const time =
-    new Date(state.deadline).getTime();
-
-  return (
-    Number.isFinite(time) &&
-    time <= Date.now()
+  return d.toLocaleString(
+    "en-GB",
+    {
+      weekday:"short",
+      day:"numeric",
+      month:"short",
+      hour:"2-digit",
+      minute:"2-digit"
+    }
   );
 }
 
+function deadlinePassed(){
+  if(!state.deadline)return false;
 
-/* =====================================================
-   PLAYER DATA
-   ===================================================== */
+  const t=new Date(state.deadline).getTime();
 
-function normaliseDashboard(raw) {
-  const data = first(raw) || {};
+  return Number.isFinite(t)&&t<=Date.now();
+}
 
-  return {
-    success: data.success !== false,
-    player: data.player || {},
-    competition: data.competition || {},
-    current_round:
-      data.current_round ||
-      data.round ||
-      {},
-    selection:
-      data.selection ||
-      null,
-    used_teams:
-      data.used_teams ||
-      [],
-    fixtures:
-      data.fixtures ||
-      []
+function normalise(raw){
+  const d=first(raw)||{};
+
+  return{
+    success:d.success!==false,
+    player:d.player||{},
+    competition:d.competition||{},
+    current_round:d.current_round||d.round||{},
+    selection:d.selection||null,
+    used_teams:d.used_teams||[],
+    fixtures:d.fixtures||[]
   };
 }
 
-function isPaymentDue() {
-  return (
-    String(
-      state.data?.player?.status || ""
-    ).toLowerCase() === "payment_due"
+function paymentDue(){
+  return String(
+    state.data?.player?.status||""
+  ).toLowerCase()==="payment_due";
+}
+
+function rolloverGame(){
+  return Number(
+    state.data?.competition?.rollover_number||0
+  )>0;
+}
+
+function roundOpen(){
+  const r=state.data?.current_round||{};
+
+  const s=String(
+    state.data?.player?.status||""
+  ).toLowerCase();
+
+  return(
+    r.status==="open"&&
+    !deadlinePassed()&&
+    !["payment_due","eliminated","removed"].includes(s)
   );
 }
 
-function isRolloverGame() {
-  const competition =
-    state.data?.competition || {};
-
-  return (
-    Number(
-      competition.rollover_number || 0
-    ) > 0
-  );
+function homeId(f){
+  return f.home_team_id||f.home_id||f.homeTeamId||null;
 }
 
-function roundIsOpen() {
-  const round =
-    state.data?.current_round || {};
-
-  const status =
-    String(
-      state.data?.player?.status || ""
-    ).toLowerCase();
-
-  return (
-    round.status === "open" &&
-    !deadlinePassed() &&
-    status !== "payment_due" &&
-    status !== "eliminated" &&
-    status !== "removed"
-  );
+function awayId(f){
+  return f.away_team_id||f.away_id||f.awayTeamId||null;
 }
 
-
-/* =====================================================
-   TEAM / FIXTURE HELPERS
-   ===================================================== */
-
-function getUsedTeams() {
-  const ids = new Set();
-  const names = new Set();
-
-  (
-    state.data?.used_teams ||
-    []
-  ).forEach((team) => {
-
-    if (!team) {
-      return;
-    }
-
-    if (typeof team === "string") {
-      names.add(
-        team.trim().toLowerCase()
-      );
-      return;
-    }
-
-    const id =
-      team.team_id ||
-      team.id;
-
-    const name =
-      team.team_name ||
-      team.name ||
-      team.short_name;
-
-    if (id) {
-      ids.add(String(id));
-    }
-
-    if (name) {
-      names.add(
-        String(name)
-          .trim()
-          .toLowerCase()
-      );
-    }
-  });
-
-  return {
-    ids,
-    names
-  };
-}
-
-function isTeamUsed(
-  teamId,
-  teamName,
-  used
-) {
-  if (
-    teamId &&
-    used.ids.has(String(teamId))
-  ) {
-    return true;
-  }
-
-  if (
-    teamName &&
-    used.names.has(
-      String(teamName)
-        .trim()
-        .toLowerCase()
-    )
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
-function getFixtureHomeId(
-  fixture
-) {
-  return (
-    fixture.home_team_id ||
-    fixture.home_id ||
-    fixture.homeTeamId ||
-    null
-  );
-}
-
-function getFixtureAwayId(
-  fixture
-) {
-  return (
-    fixture.away_team_id ||
-    fixture.away_id ||
-    fixture.awayTeamId ||
-    null
-  );
-}
-
-function getFixtureHomeName(
-  fixture
-) {
-  return (
-    fixture.home_name ||
-    fixture.home_team ||
-    fixture.home ||
-    fixture.homeTeam ||
+function homeName(f){
+  return(
+    f.home_name||
+    f.home_team||
+    f.home||
+    f.homeTeam||
     "Home"
   );
 }
 
-function getFixtureAwayName(
-  fixture
-) {
-  return (
-    fixture.away_name ||
-    fixture.away_team ||
-    fixture.away ||
-    fixture.awayTeam ||
+function awayName(f){
+  return(
+    f.away_name||
+    f.away_team||
+    f.away||
+    f.awayTeam||
     "Away"
   );
 }
 
-function getTeamNameFromFixture(
-  fixture,
-  teamId
-) {
-  if (!fixture) {
-    return "Team selected";
+function teamName(f,id){
+  if(!f)return"Team selected";
+
+  if(
+    String(homeId(f))===
+    String(id)
+  ){
+    return homeName(f);
   }
 
-  if (
-    String(
-      getFixtureHomeId(fixture)
-    ) === String(teamId)
-  ) {
-    return getFixtureHomeName(
-      fixture
-    );
+  if(
+    String(awayId(f))===
+    String(id)
+  ){
+    return awayName(f);
   }
 
-  if (
-    String(
-      getFixtureAwayId(fixture)
-    ) === String(teamId)
-  ) {
-    return getFixtureAwayName(
-      fixture
-    );
-  }
+  return"Team selected";
+}
 
-  return "Team selected";
+function usedTeams(){
+  const ids=new Set();
+  const names=new Set();
+
+  (state.data?.used_teams||[])
+    .forEach(t=>{
+      if(!t)return;
+
+      if(typeof t==="string"){
+        names.add(
+          t.trim().toLowerCase()
+        );
+        return;
+      }
+
+      const id=t.team_id||t.id;
+      const n=t.team_name||t.name||t.short_name;
+
+      if(id){
+        ids.add(String(id));
+      }
+
+      if(n){
+        names.add(
+          String(n)
+            .trim()
+            .toLowerCase()
+        );
+      }
+    });
+
+  return{ids,names};
+}
+
+function isUsed(id,name,u){
+  return(
+    (id&&u.ids.has(String(id)))||
+    (
+      name&&
+      u.names.has(
+        String(name)
+          .trim()
+          .toLowerCase()
+      )
+    )
+  );
 }
 
 
 /* =====================================================
-   ROLLOVER NOTICE
+   NOTICES
    ===================================================== */
 
-function ensureRolloverNotice() {
+function ensureNotice(id,afterId){
+  let n=document.getElementById(id);
 
-  let notice =
-    document.getElementById(
-      "rolloverNotice"
-    );
+  if(n)return n;
 
-  if (notice) {
-    return notice;
-  }
+  n=document.createElement("section");
+  n.id=id;
+  n.style.display="none";
 
-  notice =
-    document.createElement(
-      "section"
-    );
+  const main=document.querySelector("main");
 
-  notice.id =
-    "rolloverNotice";
+  if(main){
+    const after=
+      afterId&&
+      document.getElementById(afterId);
 
-  notice.style.display =
-    "none";
-
-  const main =
-    document.querySelector(
-      "main"
-    );
-
-  if (main) {
-
-    main.insertBefore(
-      notice,
-      main.firstChild
-    );
-  }
-
-  return notice;
-}
-
-function renderRolloverNotice() {
-
-  const notice =
-    ensureRolloverNotice();
-
-  if (!notice) {
-    return;
-  }
-
-  const player =
-    state.data?.player || {};
-
-  const competition =
-    state.data?.competition || {};
-
-  if (!isRolloverGame()) {
-
-    notice.style.display =
-      "none";
-
-    notice.innerHTML =
-      "";
-
-    return;
-  }
-
-  const rolloverNumber =
-    Number(
-      player.rollover_number ??
-      competition.rollover_number ??
-      0
-    );
-
-  const entryFee =
-    player.entry_fee ??
-    player.rollover_entry_fee ??
-    competition.entry_fee ??
-    5;
-
-  const prizePot =
-    competition.prize_pot ??
-    0;
-
-  const paymentDue =
-    isPaymentDue();
-
-  const rejoined =
-    player.rejoined === true;
-
-  if (paymentDue) {
-
-    notice.style.display =
-      "";
-
-    notice.innerHTML = `
-      <div
-        style="
-          background:linear-gradient(
-            135deg,
-            rgba(245,158,11,.15),
-            rgba(255,255,255,.04)
-          );
-          border:1px solid rgba(245,158,11,.30);
-          border-radius:18px;
-          padding:18px;
-          margin-bottom:16px;
-        "
-      >
-
-        <div
-          style="
-            font-size:12px;
-            font-weight:900;
-            letter-spacing:.10em;
-            text-transform:uppercase;
-            color:#fcd34d;
-          "
-        >
-          NEW GAME
-        </div>
-
-        <div
-          style="
-            font-size:22px;
-            font-weight:900;
-            margin-top:5px;
-          "
-        >
-          Rollover Game ${rolloverNumber}
-        </div>
-
-        <div
-          style="
-            margin-top:9px;
-            line-height:1.5;
-            opacity:.82;
-          "
-        >
-          The previous game has ended and
-          a new game has started.
-          Your place is reserved, but payment
-          is required before you can make a selection.
-        </div>
-
-        <div
-          style="
-            display:grid;
-            grid-template-columns:1fr 1fr;
-            gap:10px;
-            margin-top:15px;
-          "
-        >
-
-          <div
-            style="
-              background:rgba(255,255,255,.05);
-              border-radius:12px;
-              padding:11px;
-            "
-          >
-
-            <div
-              style="
-                font-size:11px;
-                opacity:.6;
-                text-transform:uppercase;
-              "
-            >
-              Your entry
-            </div>
-
-            <div
-              style="
-                font-size:20px;
-                font-weight:900;
-                margin-top:3px;
-              "
-            >
-              ${money(entryFee)}
-            </div>
-
-          </div>
-
-          <div
-            style="
-              background:rgba(255,255,255,.05);
-              border-radius:12px;
-              padding:11px;
-            "
-          >
-
-            <div
-              style="
-                font-size:11px;
-                opacity:.6;
-                text-transform:uppercase;
-              "
-            >
-              Prize pot
-            </div>
-
-            <div
-              style="
-                font-size:20px;
-                font-weight:900;
-                margin-top:3px;
-              "
-            >
-              ${money(prizePot)}
-            </div>
-
-          </div>
-
-        </div>
-
-        <div
-          style="
-            margin-top:14px;
-            padding:10px 12px;
-            border-radius:12px;
-            background:rgba(245,158,11,.10);
-            color:#fcd34d;
-            font-weight:800;
-            font-size:13px;
-          "
-        >
-          PAYMENT REQUIRED
-        </div>
-
-        <div
-          style="
-            margin-top:6px;
-            font-size:12px;
-            opacity:.65;
-          "
-        >
-          Please contact the administrator
-          to arrange payment.
-        </div>
-
-      </div>
-    `;
-
-    return;
-  }
-
-  if (rejoined) {
-
-    notice.style.display =
-      "";
-
-    notice.innerHTML = `
-      <div
-        style="
-          background:rgba(34,197,94,.08);
-          border:1px solid rgba(34,197,94,.22);
-          border-radius:18px;
-          padding:16px 18px;
-          margin-bottom:16px;
-        "
-      >
-
-        <div
-          style="
-            color:#86efac;
-            font-size:12px;
-            font-weight:900;
-            letter-spacing:.10em;
-            text-transform:uppercase;
-          "
-        >
-          NEW GAME
-        </div>
-
-        <div
-          style="
-            font-size:20px;
-            font-weight:900;
-            margin-top:4px;
-          "
-        >
-          You're back in!
-        </div>
-
-        <div
-          style="
-            margin-top:7px;
-            opacity:.75;
-            line-height:1.45;
-          "
-        >
-          Rollover Game ${rolloverNumber}
-          is underway.
-          Your entry has been paid and all
-          Premier League teams are available again.
-        </div>
-
-        <div
-          style="
-            margin-top:10px;
-            font-weight:800;
-            color:#86efac;
-          "
-        >
-          Entry paid: ${money(entryFee)}
-        </div>
-
-      </div>
-    `;
-
-    return;
-  }
-
-  notice.style.display =
-    "";
-
-  notice.innerHTML = `
-    <div
-      style="
-        background:rgba(255,255,255,.04);
-        border:1px solid rgba(255,255,255,.10);
-        border-radius:18px;
-        padding:16px 18px;
-        margin-bottom:16px;
-      "
-    >
-
-      <div
-        style="
-          font-size:12px;
-          font-weight:900;
-          letter-spacing:.10em;
-          text-transform:uppercase;
-          opacity:.65;
-        "
-      >
-        NEW GAME
-      </div>
-
-      <div
-        style="
-          font-size:20px;
-          font-weight:900;
-          margin-top:4px;
-        "
-      >
-        Rollover Game ${rolloverNumber}
-      </div>
-
-      <div
-        style="
-          margin-top:7px;
-          opacity:.75;
-        "
-      >
-        All Premier League teams are
-        available again.
-      </div>
-
-    </div>
-  `;
-}
-
-
-/* =====================================================
-   NEXT ROUND / FIXTURE BREAK NOTICE
-   ===================================================== */
-
-function ensureNextRoundNotice() {
-
-  let notice =
-    document.getElementById(
-      "nextRoundNotice"
-    );
-
-  if (notice) {
-    return notice;
-  }
-
-  notice =
-    document.createElement(
-      "section"
-    );
-
-  notice.id =
-    "nextRoundNotice";
-
-  notice.style.display =
-    "none";
-
-  const main =
-    document.querySelector(
-      "main"
-    );
-
-  if (main) {
-
-    const rollover =
-      document.getElementById(
-        "rolloverNotice"
-      );
-
-    if (rollover) {
-
+    if(after){
       main.insertBefore(
-        notice,
-        rollover.nextSibling
+        n,
+        after.nextSibling
       );
-
-    } else {
-
+    }else{
       main.insertBefore(
-        notice,
+        n,
         main.firstChild
       );
     }
   }
 
-  return notice;
+  return n;
 }
 
-function renderNextRoundNotice() {
+function renderNotices(){
+  const roll=
+    ensureNotice("rolloverNotice");
 
-  const notice =
-    ensureNextRoundNotice();
+  if(!rolloverGame()){
+    roll.style.display="none";
+    roll.innerHTML="";
+  }else{
+    const p=state.data?.player||{};
+    const c=state.data?.competition||{};
 
-  if (!notice) {
-    return;
+    const n=Number(
+      p.rollover_number??
+      c.rollover_number??
+      0
+    );
+
+    const fee=
+      p.entry_fee??
+      p.rollover_entry_fee??
+      c.entry_fee??
+      5;
+
+    roll.style.display="";
+
+    roll.innerHTML=`
+      <div style="
+        background:rgba(255,255,255,.04);
+        border:1px solid rgba(255,255,255,.1);
+        border-radius:18px;
+        padding:16px 18px;
+        margin-bottom:16px
+      ">
+        <div class="muted">
+          NEW GAME
+        </div>
+
+        <div style="
+          font-size:20px;
+          font-weight:900;
+          margin-top:4px
+        ">
+          Rollover Game ${n}
+        </div>
+
+        <div style="
+          margin-top:7px;
+          opacity:.75
+        ">
+          ${
+            paymentDue()
+              ? "Payment is required before you can make a selection."
+              : "All Premier League teams are available again."
+          }
+        </div>
+
+        <div style="
+          margin-top:10px;
+          font-weight:800
+        ">
+          ${
+            paymentDue()
+              ? "PAYMENT REQUIRED"
+              : "Entry: "+money(fee)
+          }
+        </div>
+      </div>
+    `;
   }
 
-  const round =
-    state.data?.current_round || {};
+  const next=
+    ensureNotice(
+      "nextRoundNotice",
+      "rolloverNotice"
+    );
 
-  const start =
+  const r=
+    state.data?.current_round||{};
+
+  const start=
     new Date(
-      round.start_time || ""
+      r.start_time||""
     ).getTime();
 
-  if (
-    !Number.isFinite(start)
-  ) {
-
-    notice.style.display =
-      "none";
-
-    notice.innerHTML =
-      "";
-
-    return;
-  }
-
-  const hoursUntil =
-    (start - Date.now()) /
-    3600000;
-
-  /*
-    Only show this for a genuine
-    long fixture break.
-  */
-
-  if (
-  round.status !== "upcoming" ||
-  hoursUntil <= 48
-) {
-
-    notice.style.display =
-      "none";
-
-    notice.innerHTML =
-      "";
-
-    return;
-  }
-
-  const fixtures =
-    Array.isArray(
-      state.data?.fixtures
-    )
-      ? state.data.fixtures
-          .slice()
-          .sort(
-            (a, b) =>
-              new Date(
-                a.kickoff_time
-              ).getTime() -
-              new Date(
-                b.kickoff_time
-              ).getTime()
-          )
-      : [];
-
-  const firstKickoff =
-    fixtures[0]?.kickoff_time ||
-    round.start_time;
-
-  notice.style.display =
-    "";
-
-  notice.innerHTML = `
-    <div
-      style="
-        background:linear-gradient(
-          135deg,
-          rgba(59,130,246,.12),
-          rgba(255,255,255,.04)
+  if(
+    !Number.isFinite(start)||
+    r.status!=="upcoming"||
+    ((start-Date.now())/3600000)<=48
+  ){
+    next.style.display="none";
+    next.innerHTML="";
+  }else{
+    const f=
+      (state.data?.fixtures||[])
+        .slice()
+        .sort(
+          (a,b)=>
+            new Date(a.kickoff_time)-
+            new Date(b.kickoff_time)
         );
+
+    next.style.display="";
+
+    next.innerHTML=`
+      <div style="
+        background:rgba(59,130,246,.1);
         border:1px solid rgba(96,165,250,.22);
         border-radius:18px;
-        padding:18px;
-        margin-bottom:16px;
-      "
-    >
+        padding:16px 18px;
+        margin-bottom:16px
+      ">
+        <div class="muted">
+          NEXT ROUND
+        </div>
 
-      <div
-        style="
-          font-size:12px;
+        <div style="
+          font-size:21px;
           font-weight:900;
-          letter-spacing:.10em;
-          text-transform:uppercase;
-          color:#93c5fd;
-        "
-      >
-        NEXT ROUND
-      </div>
+          margin-top:4px
+        ">
+          Round ${
+            esc(
+              r.game_round_number||
+              r.round_number||
+              ""
+            )
+          }
+        </div>
 
-      <div
-        style="
-          font-size:23px;
-          font-weight:900;
-          margin-top:5px;
-        "
-      >
-        Round ${escapeHtml(
-          round.round_number || ""
-        )}
-      </div>
-
-      <div
-        style="
-          margin-top:8px;
-          font-size:16px;
-          font-weight:700;
-        "
-      >
-        Premier League fixtures return
-      </div>
-
-      <div
-        style="
+        <div style="
           margin-top:7px;
-          opacity:.72;
-          line-height:1.45;
-        "
-      >
-        There is a break before the next
-        round of fixtures.
-      </div>
-
-      <div
-        style="
-          display:grid;
-          grid-template-columns:1fr 1fr;
-          gap:10px;
-          margin-top:15px;
-        "
-      >
-
-        <div
-          style="
-            background:rgba(255,255,255,.05);
-            border-radius:12px;
-            padding:11px;
-          "
-        >
-
-          <div
-            style="
-              font-size:10px;
-              opacity:.6;
-              text-transform:uppercase;
-            "
-          >
-            First fixture
-          </div>
-
-          <div
-            style="
-              font-size:14px;
-              font-weight:800;
-              margin-top:4px;
-            "
-          >
-            ${escapeHtml(
-              formatDate(firstKickoff)
-            )}
-          </div>
-
+          opacity:.75
+        ">
+          Premier League fixtures return.
         </div>
 
-        <div
-          style="
-            background:rgba(255,255,255,.05);
-            border-radius:12px;
-            padding:11px;
-          "
-        >
-
-          <div
-            style="
-              font-size:10px;
-              opacity:.6;
-              text-transform:uppercase;
-            "
-          >
-            Selection deadline
-          </div>
-
-          <div
-            style="
-              font-size:14px;
-              font-weight:800;
-              margin-top:4px;
-            "
-          >
-            ${escapeHtml(
-              formatDate(
-                round.selection_deadline
-              )
-            )}
-          </div>
-
-        </div>
-
-      </div>
-
-      <div
-        style="
-          margin-top:14px;
+        <div style="
+          margin-top:9px;
           color:#93c5fd;
-          font-size:13px;
-          font-weight:800;
-        "
-      >
-        You don't need to do anything yet.
-        The next round will open automatically.
+          font-weight:800
+        ">
+          First fixture:
+          ${esc(
+            formatDate(
+              f[0]?.kickoff_time||
+              r.start_time
+            )
+          )}
+        </div>
       </div>
-
-    </div>
-  `;
+    `;
+  }
 }
 
 
@@ -1080,288 +453,160 @@ function renderNextRoundNotice() {
    DASHBOARD
    ===================================================== */
 
-function renderDashboard() {
+function renderDashboard(){
+  const d=state.data;
 
-  const d =
-    state.data;
+  if(!d)return;
 
-  if (!d) {
-    return;
-  }
+  const p=d.player||{};
+  const c=d.competition||{};
+  const r=d.current_round||{};
 
-  const player =
-    d.player || {};
+  $("playerName").textContent=
+    p.name||
+    PLAYER_CODE||
+    "Player";
 
-  const competition =
-    d.competition || {};
+  const gameRound=
+    r.game_round_number||
+    (
+      Number(r.round_number)>=5
+        ? Number(r.round_number)-4
+        : Number(r.round_number)
+    );
 
-  const round =
-    d.current_round || {};
+  $("roundNumber").textContent=
+    gameRound
+      ? `Round ${gameRound}`
+      : "Waiting";
 
-  $("playerName").textContent =
-    player.name ||
-    PLAYER_CODE;
-
-  const gameRoundNumber =
-  round.game_round_number ||
-  (
-    Number(round.round_number) >= 5
-      ? Number(round.round_number) - 4
-      : Number(round.round_number)
-  );
-
-$("roundNumber").textContent =
-  gameRoundNumber
-    ? `Round ${gameRoundNumber}`
-    : "Waiting";
-
-  let statusText =
+  let status=
     "Waiting to start";
 
-  const playerStatus =
+  const ps=
     String(
-      player.status ||
-      ""
+      p.status||""
     ).toLowerCase();
 
-  if (
-    playerStatus ===
-    "payment_due"
-  ) {
-
-    statusText =
-      "Payment required";
-
-  } else if (
-    round.status ===
-    "open"
-  ) {
-
-    statusText =
-      "Choose your team";
-
-  } else if (
-    round.status ===
-    "locked"
-  ) {
-
-    statusText =
-      "Selections locked";
-
-  } else if (
-    round.status ===
-    "in_progress"
-  ) {
-
-    statusText =
-      "Round in progress";
-
-  } else if (
-    round.status ===
-    "completed"
-  ) {
-
-    statusText =
-      "Round completed";
+  if(ps==="payment_due"){
+    status="Payment required";
+  }else if(r.status==="open"){
+    status="Choose your team";
+  }else if(r.status==="locked"){
+    status="Selections locked";
+  }else if(r.status==="in_progress"){
+    status="Round in progress";
+  }else if(r.status==="completed"){
+    status="Round completed";
   }
 
-  const heroStatus =
+  const heroStatus=
     document.querySelector(
       ".hero-status"
     );
 
-  if (heroStatus) {
-
-    heroStatus.textContent =
-      statusText;
+  if(heroStatus){
+    heroStatus.textContent=status;
   }
 
-  const badge =
+  const badge=
     document.querySelector(
       ".badge"
     );
 
-  if (badge) {
-
-    const status =
+  if(badge){
+    const s=
       String(
-        player.status ||
-        "alive"
+        p.status||"alive"
       ).toUpperCase();
 
-    badge.textContent =
-      status;
+    badge.textContent=s;
 
-    badge.className =
-      "badge " +
+    badge.className=
+      "badge "+
       (
-        status ===
-        "ALIVE"
+        s==="ALIVE"
           ? "alive"
           : ""
       );
   }
 
-  const stats =
+  const stats=
     document.querySelectorAll(
       ".stat-grid strong"
     );
 
-  if (
-    stats.length >= 3
-  ) {
+  if(stats.length>=3){
+    stats[0].textContent=
+      (d.used_teams||[]).length;
 
-    stats[0].textContent =
-      (
-        d.used_teams ||
-        []
-      ).length;
+    stats[1].textContent=
+      p.missed_selection_count??0;
 
-    stats[1].textContent =
-      player.missed_selection_count ??
-      0;
-
-    stats[2].textContent =
+    stats[2].textContent=
       money(
-        player.entry_fee ??
-        competition.entry_fee
+        p.entry_fee??
+        c.entry_fee
       );
   }
 
-  state.deadline =
-    round.selection_deadline ||
-    null;
+  state.deadline=
+    r.selection_deadline||null;
 
-  if (
-    !state.pendingSelection
-  ) {
-
-    state.selectionTeamId =
-      d.selection?.team_id ||
+  if(!state.pendingSelection){
+    state.selectionTeamId=
+      d.selection?.team_id||
       null;
   }
 
-  let selectedTeamName =
+  let selected=
+    d.selection?.team_name||
     null;
 
-  if (
-    state.pendingSelection &&
+  if(
+    !selected&&
     state.selectionTeamId
-  ) {
+  ){
+    const f=
+      (d.fixtures||[])
+        .find(
+          x=>
+            String(homeId(x))===
+              String(state.selectionTeamId)||
+            String(awayId(x))===
+              String(state.selectionTeamId)
+        );
 
-    const pendingFixture =
-      (
-        d.fixtures ||
-        []
-      ).find(
-        (fixture) =>
-          String(
-            getFixtureHomeId(
-              fixture
-            )
-          ) ===
-          String(
-            state.selectionTeamId
-          ) ||
-          String(
-            getFixtureAwayId(
-              fixture
-            )
-          ) ===
-          String(
-            state.selectionTeamId
-          )
-      );
-
-    selectedTeamName =
-      getTeamNameFromFixture(
-        pendingFixture,
+    selected=
+      teamName(
+        f,
         state.selectionTeamId
       );
-
-  } else {
-
-    selectedTeamName =
-      d.selection?.team_name ||
-      null;
-
-    if (
-      !selectedTeamName &&
-      state.selectionTeamId
-    ) {
-
-      const selectedFixture =
-        (
-          d.fixtures ||
-          []
-        ).find(
-          (fixture) =>
-            String(
-              getFixtureHomeId(
-                fixture
-              )
-            ) ===
-            String(
-              state.selectionTeamId
-            ) ||
-            String(
-              getFixtureAwayId(
-                fixture
-              )
-            ) ===
-            String(
-              state.selectionTeamId
-            )
-        );
-
-      selectedTeamName =
-        getTeamNameFromFixture(
-          selectedFixture,
-          state.selectionTeamId
-        );
-    }
   }
 
-  $("selectionTitle")
-    .textContent =
-    selectedTeamName ||
+  $("selectionTitle").textContent=
+    selected||
     "Choose your team";
 
-  $("lockPill")
-  .textContent =
-  playerStatus === "eliminated"
-    ? "ELIMINATED"
-    : roundIsOpen()
-      ? "OPEN"
-      : String(
-          round.status ||
-          "WAITING"
-        ).toUpperCase();
+  $("lockPill").textContent=
+    ps==="eliminated"
+      ? "ELIMINATED"
+      : roundOpen()
+        ? "OPEN"
+        : String(
+            r.status||
+            "WAITING"
+          ).toUpperCase();
 
-  renderRolloverNotice();
-
-  renderNextRoundNotice();
-
+  renderNotices();
   renderFixtures();
 
-  const hint =
-    $("selectionHint");
-
-  if (hint) {
-
-    if (isPaymentDue()) {
-
-      hint.textContent =
-        "Payment is required before you can make a selection.";
-
-    } else {
-
-      hint.textContent =
-        selectedTeamName
-          ? `Your current selection is ${selectedTeamName}. You can change it until the deadline.`
-          : "Choose one Premier League team to win its game.";
-    }
-  }
+  $("selectionHint").textContent=
+    paymentDue()
+      ? "Payment is required before you can make a selection."
+      : selected
+        ? `Your current selection is ${selected}. You can change it until the deadline.`
+        : "Choose one Premier League team to win its game.";
 
   updateCountdown();
 }
@@ -1371,294 +616,175 @@ $("roundNumber").textContent =
    FIXTURES
    ===================================================== */
 
-function renderFixtures() {
+function renderFixtures(){
+  const el=$("fixtures");
 
-  const el =
-    $("fixtures");
+  const fixtures=
+    state.data?.fixtures||[];
 
-  const fixtures =
-    state.data?.fixtures ||
-    [];
+  const u=usedTeams();
+  const open=roundOpen();
 
-  const used =
-    getUsedTeams();
-
-  const open =
-    roundIsOpen();
-
-  if (
-    !fixtures.length
-  ) {
-
-    el.innerHTML = `
+  if(!fixtures.length){
+    el.innerHTML=`
       <div class="empty-state">
         No fixtures are available for this round.
       </div>
     `;
 
-    $("confirmBtn")
-      .disabled = true;
+    $("confirmBtn").disabled=true;
 
     return;
   }
 
-  el.innerHTML =
+  el.innerHTML=
     fixtures
-      .map(
-        (fixture) => {
+      .map(f=>{
+        const hId=homeId(f);
+        const aId=awayId(f);
+        const h=homeName(f);
+        const a=awayName(f);
+        const time=formatDate(
+          f.kickoff_time
+        );
 
-          const homeId =
-            getFixtureHomeId(
-              fixture
+        const fs=
+          f.status||
+          "scheduled";
+
+        const btn=(id,name)=>{
+          const selected=
+            state.selectionTeamId&&
+            String(
+              state.selectionTeamId
+            )===
+            String(id);
+
+          const used=
+            !selected&&
+            isUsed(
+              id,
+              name,
+              u
             );
 
-          const awayId =
-            getFixtureAwayId(
-              fixture
-            );
+          const unavailable=
+            fs!=="scheduled";
 
-          const home =
-            getFixtureHomeName(
-              fixture
-            );
+          const disabled=
+            used||
+            unavailable||
+            !open;
 
-          const away =
-            getFixtureAwayName(
-              fixture
-            );
+          let label=
+            selected
+              ? "SELECTED"
+              : used
+                ? "USED"
+                : unavailable
+                  ? String(fs).toUpperCase()
+                  : !open
+                    ? "LOCKED"
+                    : "PICK";
 
-          const kickoff =
-            formatDate(
-              fixture.kickoff_time
-            );
-
-          const fixtureStatus =
-            fixture.status ||
-            "scheduled";
-
-          function teamButton(
-            id,
-            name
-          ) {
-
-            const selected =
-              state.selectionTeamId &&
-              String(
-                state.selectionTeamId
-              ) ===
-              String(id);
-
-            const usedAlready =
-              !selected &&
-              isTeamUsed(
-                id,
-                name,
-                used
-              );
-
-            const unavailable =
-              fixtureStatus !==
-              "scheduled";
-
-            const disabled =
-              usedAlready ||
-              unavailable ||
-              !open;
-
-            let label =
-              "PICK";
-
-            if (selected) {
-
-              label =
-                "SELECTED";
-
-            } else if (
-              usedAlready
-            ) {
-
-              label =
-                "USED";
-
-            } else if (
-              unavailable
-            ) {
-
-              label =
-                String(
-                  fixtureStatus
-                ).toUpperCase();
-
-            } else if (
-              !open
-            ) {
-
-              label =
-                "LOCKED";
-            }
-
-            const usedStyle =
-              usedAlready
-                ? `
-                  style="
-                    background:#3a3f48;
-                    border-color:#555b65;
-                    color:#8f959e;
-                    opacity:1;
-                    cursor:not-allowed;
-                  "
-                `
-                : "";
-
-            return `
-              <button
-                class="pick-btn ${
-                  selected
-                    ? "selected"
-                    : usedAlready
+          return`
+            <button
+              class="pick-btn ${
+                selected
+                  ? "selected"
+                  : used
                     ? "used"
                     : ""
-                }"
-                data-team-id="${
-                  id || ""
-                }"
-                ${
-                  disabled
-                    ? "disabled"
-                    : ""
-                }
-                ${usedStyle}
-              >
-                ${label} ${name}
-              </button>
-            `;
-          }
+              }"
+              data-team-id="${id||""}"
+              ${disabled?"disabled":""}
+            >
+              ${label} ${esc(name)}
+            </button>
+          `;
+        };
 
-          return `
-            <div class="fixture">
-
-              <div
-                class="fixture-main"
-                style="
-                  width:100%;
-                "
-              >
-
-                <div
-                  class="fixture-teams"
-                >
-                  ${home} v ${away}
-                </div>
-
-                <div
-                  class="fixture-time"
-                >
-                  ${kickoff}
-                </div>
-
-                <div
-                  style="
-                    display:flex;
-                    gap:8px;
-                    flex-wrap:wrap;
-                    margin-top:10px;
-                  "
-                >
-
-                  ${teamButton(
-                    homeId,
-                    home
-                  )}
-
-                  ${teamButton(
-                    awayId,
-                    away
-                  )}
-
-                </div>
-
+        return`
+          <div class="fixture">
+            <div
+              class="fixture-main"
+              style="width:100%"
+            >
+              <div class="fixture-teams">
+                ${esc(h)}
+                v
+                ${esc(a)}
               </div>
 
+              <div class="fixture-time">
+                ${esc(time)}
+              </div>
+
+              <div style="
+                display:flex;
+                gap:8px;
+                flex-wrap:wrap;
+                margin-top:10px
+              ">
+                ${btn(hId,h)}
+                ${btn(aId,a)}
+              </div>
             </div>
-          `;
-        }
-      )
+          </div>
+        `;
+      })
       .join("");
 
   document
     .querySelectorAll(
       ".pick-btn[data-team-id]"
     )
-    .forEach(
-      (button) => {
+    .forEach(b=>{
+      b.addEventListener(
+        "click",
+        ()=>{
+          if(b.disabled)return;
 
-        button.addEventListener(
-          "click",
-          () => {
+          state.selectionTeamId=
+            b.dataset.teamId;
 
-            if (
-              button.disabled
-            ) {
-              return;
-            }
+          state.pendingSelection=
+            true;
 
-            state.selectionTeamId =
-              button.dataset.teamId;
+          const f=
+            fixtures.find(
+              x=>
+                String(homeId(x))===
+                  String(state.selectionTeamId)||
+                String(awayId(x))===
+                  String(state.selectionTeamId)
+            );
 
-            state.pendingSelection =
-              true;
+          const n=
+            teamName(
+              f,
+              state.selectionTeamId
+            );
 
-            const selectedFixture =
-              fixtures.find(
-                (fixture) =>
-                  String(
-                    getFixtureHomeId(
-                      fixture
-                    )
-                  ) ===
-                  String(
-                    state.selectionTeamId
-                  ) ||
-                  String(
-                    getFixtureAwayId(
-                      fixture
-                    )
-                  ) ===
-                  String(
-                    state.selectionTeamId
-                  )
-              );
+          $("selectionTitle")
+            .textContent=n;
 
-            const teamName =
-              getTeamNameFromFixture(
-                selectedFixture,
-                state.selectionTeamId
-              );
+          $("selectionHint")
+            .textContent=
+              `Your current selection is ${n}. You can change it until the deadline.`;
 
-            $("selectionTitle")
-              .textContent =
-              teamName;
+          $("confirmBtn").disabled=false;
 
-            $("selectionHint")
-              .textContent =
-              `Your current selection is ${teamName}. You can change it until the deadline.`;
+          $("confirmBtn").textContent=
+            "Confirm selection";
 
-            $("confirmBtn")
-              .disabled = false;
+          renderFixtures();
+        }
+      );
+    });
 
-            $("confirmBtn")
-              .textContent =
-              "Confirm selection";
-
-            renderFixtures();
-          }
-        );
-      }
-    );
-
-  $("confirmBtn")
-    .disabled =
-    !state.selectionTeamId ||
+  $("confirmBtn").disabled=
+    !state.selectionTeamId||
     !open;
 }
 
@@ -1667,110 +793,82 @@ function renderFixtures() {
    SAVE SELECTION
    ===================================================== */
 
-async function saveSelection() {
+async function saveSelection(){
+  if(!state.selectionTeamId)return;
 
-  if (
-    !state.selectionTeamId
-  ) {
-    return;
-  }
-
-  if (isPaymentDue()) {
-
+  if(paymentDue()){
     $("selectionHint")
-      .textContent =
-      "Payment is required before you can make a selection.";
+      .textContent=
+        "Payment is required before you can make a selection.";
 
     return;
   }
 
-  const round =
+  const r=
     state.data?.current_round;
 
-  if (!round?.id) {
-
+  if(!r?.id){
     $("selectionHint")
-      .textContent =
-      "There is no open round.";
+      .textContent=
+        "There is no open round.";
 
     return;
   }
 
-  const button =
-    $("confirmBtn");
+  const b=$("confirmBtn");
 
-  button.disabled =
-    true;
+  b.disabled=true;
+  b.textContent="Saving...";
 
-  button.textContent =
-    "Saving...";
-
-  try {
-
-    const result =
+  try{
+    const result=
       await callRpc(
         "make_selection",
         {
           p_player_code:
             PLAYER_CODE,
-
           p_round_id:
-            round.id,
-
+            r.id,
           p_team_id:
             state.selectionTeamId
         }
       );
 
-    if (
-      result?.success ===
-      false
-    ) {
-
+    if(result?.success===false){
       throw new Error(
-        result.message ||
+        result.message||
         "Selection was not saved."
       );
     }
 
-    state.pendingSelection =
-  false;
+    state.pendingSelection=false;
 
-while (state.isLoading) {
-  await new Promise(
-    (resolve) => setTimeout(resolve, 100)
-  );
-}
+    await loadPlayer(false);
 
-await loadPlayer(false);
+    b.textContent=
+      "Selection saved";
 
-button.textContent =
-  "Selection saved";
-
-    button.disabled =
-      true;
+    b.disabled=true;
 
     $("selectionHint")
-      .textContent =
-      "Selection saved successfully. You can change it until the deadline.";
+      .textContent=
+        "Selection saved successfully. You can change it until the deadline.";
 
-  } catch (error) {
-
+  }catch(e){
     console.error(
-      "Selection error:",
-      error
+      "Selection error",
+      e
     );
 
-    button.disabled =
-      false;
+    b.disabled=false;
 
-    button.textContent =
+    b.textContent=
       "Confirm selection";
 
     $("selectionHint")
-      .textContent =
-      error?.message ||
-      "Selection could not be saved.";
+      .textContent=
+        e?.message||
+        "Selection could not be saved.";
   }
 }
 
@@ -1779,36 +877,27 @@ button.textContent =
    LOAD PLAYER
    ===================================================== */
 
-async function loadPlayer(
-  silent = false
-) {
-
-  if (
-    state.isLoading
-  ) {
+async function loadPlayer(){
+  if(
+    state.isLoading||
+    !PLAYER_CODE
+  ){
     return;
   }
 
-  state.isLoading =
-    true;
+  state.isLoading=true;
 
-  try {
+  try{
+    let raw=null;
+    let last=null;
 
-    let raw =
-      null;
-
-    let lastError =
-      null;
-
-    for (
-      let attempt = 0;
-      attempt < 3;
-      attempt++
-    ) {
-
-      try {
-
-        raw =
+    for(
+      let i=0;
+      i<3;
+      i++
+    ){
+      try{
+        raw=
           await callRpc(
             "get_lms_player_data",
             {
@@ -1817,121 +906,103 @@ async function loadPlayer(
             }
           );
 
-        lastError =
-          null;
-
+        last=null;
         break;
 
-      } catch (error) {
+      }catch(e){
+        last=e;
 
-        lastError =
-          error;
-
-        if (
-          attempt < 2
-        ) {
-
+        if(i<2){
           await new Promise(
-            (resolve) =>
+            x=>
               setTimeout(
-                resolve,
-                700 *
-                (attempt + 1)
+                x,
+                700*(i+1)
               )
           );
         }
       }
     }
 
-    if (
-      lastError
-    ) {
-      throw lastError;
-    }
+    if(last)throw last;
 
-    const data =
-      normaliseDashboard(
-        raw
-      );
+    const d=
+      normalise(raw);
 
-    if (
-      !data.success
-    ) {
-
+    if(!d.success){
       throw new Error(
+        d.message||
         "Player data could not be loaded."
       );
     }
 
-    state.data =
-      data;
-
-    state.hasLoadedOnce =
-      true;
-
-    state.lastLoadError =
-      null;
+    state.data=d;
+    state.hasLoadedOnce=true;
+    state.lastLoadError=null;
 
     renderDashboard();
 
-  } catch (error) {
-
+  }catch(e){
     console.error(
-      "Load player error:",
-      error
+      "Load player error",
+      e
     );
 
-    state.lastLoadError =
-      error;
+    state.lastLoadError=e;
 
-    if (
-      state.hasLoadedOnce &&
+    if(
+      state.hasLoadedOnce&&
       state.data
-    ) {
-
+    ){
       return;
     }
 
-    $("playerName")
-      .textContent =
-      "Connection error";
+    if($("playerName")){
+      $("playerName")
+        .textContent=
+          "Unable to load";
+    }
 
-    $("roundNumber")
-      .textContent =
-      "Unable to load";
+    if($("roundNumber")){
+      $("roundNumber")
+        .textContent=
+          "Please refresh";
+    }
 
-    const heroStatus =
+    const hs=
       document.querySelector(
         ".hero-status"
       );
 
-    if (heroStatus) {
-
-      heroStatus.textContent =
+    if(hs){
+      hs.textContent=
+        e?.message||
         "Please refresh the app";
     }
 
-    $("selectionTitle")
-      .textContent =
-      "Unable to load competition";
+    if($("selectionTitle")){
+      $("selectionTitle")
+        .textContent=
+          "Unable to load competition";
+    }
 
-    $("fixtures")
-      .innerHTML = `
+    if($("fixtures")){
+      $("fixtures").innerHTML=`
         <div class="empty-state">
-          ${
-            error?.message ||
+          ${esc(
+            e?.message||
             "Could not connect to the competition."
-          }
+          )}
         </div>
       `;
+    }
 
-    $("confirmBtn")
-      .disabled = true;
+    if($("confirmBtn")){
+      $("confirmBtn").disabled=true;
+    }
 
-  } finally {
-
-    state.isLoading =
-      false;
+  }finally{
+    state.isLoading=false;
   }
 }
 
@@ -1940,102 +1011,66 @@ async function loadPlayer(
    COUNTDOWN
    ===================================================== */
 
-function updateCountdown() {
+function updateCountdown(){
+  const el=$("countdown");
 
-  const el =
-    $("countdown");
+  if(!el)return;
 
-  if (!el) {
+  if(!state.deadline){
+    el.textContent="--:--:--";
     return;
   }
 
-  if (!state.deadline) {
-
-    el.textContent =
-      "--:--:--";
-
-    return;
-  }
-
-  const end =
+  const end=
     new Date(
       state.deadline
     ).getTime();
 
-  if (
-    !Number.isFinite(end)
-  ) {
-
-    el.textContent =
-      "--:--:--";
-
+  if(!Number.isFinite(end)){
+    el.textContent="--:--:--";
     return;
   }
 
-  const remaining =
+  const left=
     Math.max(
       0,
-      end - Date.now()
+      end-Date.now()
     );
 
-  if (
-    remaining === 0
-  ) {
+  const s=
+    Math.floor(
+      left/1000
+    );
 
-    el.textContent =
+  if(!left){
+    el.textContent=
       "00:00:00";
 
     return;
   }
 
-  const totalSeconds =
+  const d=
     Math.floor(
-      remaining / 1000
+      s/86400
     );
 
-  const days =
+  const h=
     Math.floor(
-      totalSeconds /
-      86400
+      (s%86400)/3600
     );
 
-  const hours =
+  const m=
     Math.floor(
-      (
-        totalSeconds %
-        86400
-      ) / 3600
+      (s%3600)/60
     );
 
-  const minutes =
-    Math.floor(
-      (
-        totalSeconds %
-        3600
-      ) / 60
-    );
+  const sec=
+    s%60;
 
-  const seconds =
-    totalSeconds %
-    60;
-
-  if (
-    days > 0
-  ) {
-
-    el.textContent =
-      `${days}d ` +
-      `${String(hours).padStart(2, "0")}:` +
-      `${String(minutes).padStart(2, "0")}:` +
-      `${String(seconds).padStart(2, "0")}`;
-
-  } else {
-
-    el.textContent =
-      `${String(hours).padStart(2, "0")}:` +
-      `${String(minutes).padStart(2, "0")}:` +
-      `${String(seconds).padStart(2, "0")}`;
-  }
+  el.textContent=
+    d
+      ? `${d}d ${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`
+      : `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
 }
 
 
@@ -2043,38 +1078,26 @@ function updateCountdown() {
    HISTORY
    ===================================================== */
 
-function ensureHistoryView() {
-
-  let historyView =
+function ensureHistoryView(){
+  let v=
     document.getElementById(
       "historyView"
     );
 
-  if (
-    historyView
-  ) {
-    return historyView;
-  }
+  if(v)return v;
 
-  historyView =
+  v=
     document.createElement(
       "section"
     );
 
-  historyView.id =
-    "historyView";
+  v.id="historyView";
+  v.className="rules-card";
+  v.style.display="none";
 
-  historyView.className =
-    "rules-card";
-
-  historyView.style.display =
-    "none";
-
-  historyView.innerHTML = `
+  v.innerHTML=`
     <div class="section-title">
-
       <div>
-
         <span class="muted">
           YOUR JOURNEY
         </span>
@@ -2082,639 +1105,266 @@ function ensureHistoryView() {
         <h2>
           Selection History
         </h2>
-
       </div>
-
     </div>
 
     <div id="historySummary"></div>
 
     <div id="historyContent">
-
       <div class="empty-state">
         Loading your history...
       </div>
-
     </div>
   `;
 
-  const main =
-    document.querySelector(
-      "main"
-    );
+  document
+    .querySelector("main")
+    ?.appendChild(v);
 
-  if (main) {
-
-    main.appendChild(
-      historyView
-    );
-  }
-
-  return historyView;
+  return v;
 }
 
-function resultLabel(result) {
-
-  const value =
+function resultLabel(v){
+  v=
     String(
-      result ||
+      v||
       "pending"
     ).toLowerCase();
 
-  if (
-    value === "win"
-  ) {
-    return "WIN";
-  }
-
-  if (
-    value === "draw"
-  ) {
-    return "DRAW";
-  }
-
-  if (
-    value === "loss"
-  ) {
-    return "LOSS";
-  }
-
-  if (
-    value === "through"
-  ) {
-    return "THROUGH";
-  }
-
-  if (
-    value === "abandoned"
-  ) {
-    return "ABANDONED";
-  }
-
-  if (
-    value === "postponed"
-  ) {
-    return "POSTPONED";
-  }
-
-  return "PENDING";
+  return(
+    v==="win"
+      ? "WIN"
+      : v==="draw"
+        ? "DRAW"
+        : v==="loss"
+          ? "LOSS"
+          : v==="through"
+            ? "THROUGH"
+            : v==="abandoned"
+              ? "ABANDONED"
+              : v==="postponed"
+                ? "POSTPONED"
+                : "PENDING"
+  );
 }
 
-function resultStyle(result) {
-
-  const value =
+function resultColor(v){
+  v=
     String(
-      result ||
-      "pending"
+      v||""
     ).toLowerCase();
 
-  if (
-    value === "win" ||
-    value === "through"
-  ) {
-    return "color:#86efac;";
-  }
-
-  if (
-    value === "loss"
-  ) {
-    return "color:#fca5a5;";
-  }
-
-  if (
-    value === "draw"
-  ) {
-    return "color:#fcd34a;";
-  }
-
-  if (
-    value === "abandoned"
-  ) {
-    return "color:#c4b5fd;";
-  }
-
-  return "color:#cbd5e1;";
+  return(
+    v==="win"||
+    v==="through"
+      ? "#86efac"
+      : v==="loss"
+        ? "#fca5a5"
+        : v==="draw"
+          ? "#fcd34d"
+          : "#cbd5e1"
+  );
 }
 
-function resultIcon(result) {
-
-  const value =
-    String(
-      result ||
-      ""
-    ).toLowerCase();
-
-  if (
-    value === "win" ||
-    value === "through"
-  ) {
-    return "✓";
-  }
-
-  if (
-    value === "loss"
-  ) {
-    return "✕";
-  }
-
-  if (
-    value === "draw"
-  ) {
-    return "—";
-  }
-
-  if (
-    value === "abandoned"
-  ) {
-    return "↻";
-  }
-
-  return "•";
-}
-
-function renderHistorySummary() {
-
-  const summary =
-    document.getElementById(
-      "historySummary"
-    );
-
-  if (!summary) {
-    return;
-  }
-
-  const history =
-    Array.isArray(
-      state.history
-    )
-      ? state.history
-      : [];
-
-  if (
-    !history.length
-  ) {
-
-    summary.innerHTML =
-      "";
-
-    return;
-  }
-
-  const wins =
-    history.filter(
-      (item) =>
-        ["win", "through"].includes(
-          String(
-            item.result ||
-            ""
-          ).toLowerCase()
-        )
-    ).length;
-
-  const losses =
-    history.filter(
-      (item) =>
-        String(
-          item.result ||
-          ""
-        ).toLowerCase() ===
-        "loss"
-    ).length;
-
-  const automatic =
-    history.filter(
-      (item) =>
-        String(
-          item.selection_type ||
-          ""
-        ).toLowerCase() ===
-        "automatic"
-    ).length;
-
-  summary.innerHTML = `
-    <div
-      style="
-        display:grid;
-        grid-template-columns:repeat(3,1fr);
-        gap:10px;
-        margin:14px 0 18px;
-      "
-    >
-
-      <div
-        style="
-          background:rgba(255,255,255,0.04);
-          border:1px solid rgba(255,255,255,0.08);
-          border-radius:14px;
-          padding:12px;
-          text-align:center;
-        "
-      >
-
-        <div
-          style="
-            font-size:22px;
-            font-weight:800;
-          "
-        >
-          ${wins}
-        </div>
-
-        <div
-          style="
-            font-size:11px;
-            opacity:.65;
-            text-transform:uppercase;
-            margin-top:3px;
-          "
-        >
-          Through
-        </div>
-
-      </div>
-
-      <div
-        style="
-          background:rgba(255,255,255,0.04);
-          border:1px solid rgba(255,255,255,0.08);
-          border-radius:14px;
-          padding:12px;
-          text-align:center;
-        "
-      >
-
-        <div
-          style="
-            font-size:22px;
-            font-weight:800;
-          "
-        >
-          ${losses}
-        </div>
-
-        <div
-          style="
-            font-size:11px;
-            opacity:.65;
-            text-transform:uppercase;
-            margin-top:3px;
-          "
-        >
-          Losses
-        </div>
-
-      </div>
-
-      <div
-        style="
-          background:rgba(255,255,255,0.04);
-          border:1px solid rgba(255,255,255,0.08);
-          border-radius:14px;
-          padding:12px;
-          text-align:center;
-        "
-      >
-
-        <div
-          style="
-            font-size:22px;
-            font-weight:800;
-          "
-        >
-          ${automatic}
-        </div>
-
-        <div
-          style="
-            font-size:11px;
-            opacity:.65;
-            text-transform:uppercase;
-            margin-top:3px;
-          "
-        >
-          Automatic
-        </div>
-
-      </div>
-
-    </div>
-  `;
-}
-
-function renderHistory() {
-
-  const view =
+function renderHistory(){
+  const v=
     ensureHistoryView();
 
-  const content =
-    view.querySelector(
+  const c=
+    v.querySelector(
       "#historyContent"
     );
 
-  if (!content) {
-    return;
-  }
-
-  const history =
+  const h=
     Array.isArray(
       state.history
     )
       ? state.history
       : [];
 
-  renderHistorySummary();
-
-  if (
-    !history.length
-  ) {
-
-    content.innerHTML = `
+  if(!h.length){
+    c.innerHTML=`
       <div
         class="empty-state"
         style="
-          padding:30px 10px;
-          text-align:center;
+          padding:30px;
+          text-align:center
         "
       >
+        🏆
+        <br><br>
 
-        <div
-          style="
-            font-size:34px;
-            margin-bottom:10px;
-          "
-        >
-          🏆
-        </div>
-
-        <div
-          style="
-            font-weight:800;
-            font-size:17px;
-          "
-        >
+        <strong>
           Your journey starts here
-        </div>
+        </strong>
 
-        <div
-          style="
-            opacity:.65;
-            margin-top:7px;
-          "
-        >
-          Your completed rounds will appear here.
-        </div>
+        <br><br>
 
+        Your completed rounds
+        will appear here.
       </div>
     `;
 
     return;
   }
 
-  content.innerHTML =
-    history
-      .map(
-        (item) => {
-
-          const roundNumber =
-            item.round_number ||
-            "?";
-
-          const teamName =
-            item.team_name ||
-            "Team";
-
-          const fixture =
-            item.fixture ||
-            "Fixture";
-
-          const result =
-            resultLabel(
-              item.result
-            );
-
-          const kickoff =
-            formatDate(
-              item.kickoff_time
-            );
-
-          const automatic =
+  const wins=
+    h.filter(
+      x=>
+        ["win","through"]
+          .includes(
             String(
-              item.selection_type ||
-              "manual"
-            ).toLowerCase() ===
-            "automatic";
+              x.result||""
+            ).toLowerCase()
+          )
+    ).length;
 
-          let score =
-            "";
+  const losses=
+    h.filter(
+      x=>
+        String(
+          x.result||""
+        ).toLowerCase()==="loss"
+    ).length;
 
-          if (
-            item.home_score !==
-              null &&
-            item.home_score !==
-              undefined &&
-            item.away_score !==
-              null &&
-            item.away_score !==
-              undefined
-          ) {
+  const automatic=
+    h.filter(
+      x=>
+        String(
+          x.selection_type||""
+        ).toLowerCase()==="automatic"
+    ).length;
 
-            score = `
-              <div
-                style="
+  document.getElementById(
+    "historySummary"
+  ).innerHTML=`
+    <div style="
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+      margin:14px 0 18px
+    ">
+      <div class="stat-grid">
+        <strong>${wins}</strong>
+        <span>Through</span>
+      </div>
+
+      <div class="stat-grid">
+        <strong>${losses}</strong>
+        <span>Losses</span>
+      </div>
+
+      <div class="stat-grid">
+        <strong>${automatic}</strong>
+        <span>Automatic</span>
+      </div>
+    </div>
+  `;
+
+  c.innerHTML=
+    h.map(
+      x=>`
+        <div style="
+          background:rgba(255,255,255,.04);
+          border:1px solid rgba(255,255,255,.08);
+          border-radius:18px;
+          padding:17px;
+          margin-bottom:12px
+        ">
+          <div style="
+            display:flex;
+            justify-content:space-between;
+            gap:12px
+          ">
+            <div>
+              <div class="muted">
+                ROUND ${esc(
+                  x.round_number||"?"
+                )}
+              </div>
+
+              <div style="
+                font-size:19px;
+                font-weight:900;
+                margin-top:5px
+              ">
+                ${esc(
+                  x.team_name||
+                  "Team"
+                )}
+              </div>
+            </div>
+
+            <div style="
+              font-weight:900;
+              color:${resultColor(
+                x.result
+              )}
+            ">
+              ${resultLabel(
+                x.result
+              )}
+            </div>
+          </div>
+
+          <div style="
+            margin-top:14px;
+            font-weight:700
+          ">
+            ${esc(
+              x.fixture||
+              "Fixture"
+            )}
+          </div>
+
+          ${
+            x.home_score!=null&&
+            x.away_score!=null
+              ? `
+                <div style="
                   font-size:26px;
                   font-weight:900;
-                  margin-top:10px;
-                  letter-spacing:.04em;
-                "
-              >
-                ${escapeHtml(
-                  item.home_score
-                )}
-                -
-                ${escapeHtml(
-                  item.away_score
-                )}
-              </div>
-            `;
-          }
-
-          const selectionBadge =
-            automatic
-              ? `
-                <div
-                  style="
-                    display:inline-flex;
-                    align-items:center;
-                    gap:6px;
-                    margin-top:10px;
-                    padding:6px 10px;
-                    border-radius:999px;
-                    background:rgba(251,191,36,.12);
-                    border:1px solid rgba(251,191,36,.25);
-                    color:#fcd34d;
-                    font-size:11px;
-                    font-weight:800;
-                    text-transform:uppercase;
-                  "
-                >
-                  ⚠ Automatic selection
+                  margin-top:10px
+                ">
+                  ${esc(x.home_score)}
+                  -
+                  ${esc(x.away_score)}
                 </div>
               `
-              : `
-                <div
-                  style="
-                    display:inline-flex;
-                    align-items:center;
-                    margin-top:10px;
-                    padding:6px 10px;
-                    border-radius:999px;
-                    background:rgba(255,255,255,.05);
-                    border:1px solid rgba(255,255,255,.08);
-                    color:#cbd5e1;
-                    font-size:11px;
-                    font-weight:700;
-                    text-transform:uppercase;
-                  "
-                >
-                  Your selection
-                </div>
-              `;
+              : ""
+          }
 
-          return `
-            <div
-              style="
-                background:rgba(255,255,255,0.04);
-                border:1px solid rgba(255,255,255,0.08);
-                border-radius:18px;
-                padding:17px;
-                margin-bottom:12px;
-              "
-            >
-
-              <div
-                style="
-                  display:flex;
-                  justify-content:space-between;
-                  align-items:flex-start;
-                  gap:12px;
-                "
-              >
-
-                <div>
-
-                  <div
-                    style="
-                      font-size:11px;
-                      text-transform:uppercase;
-                      letter-spacing:.1em;
-                      opacity:.6;
-                      font-weight:700;
-                    "
-                  >
-                    ROUND ${escapeHtml(
-                      roundNumber
-                    )}
-                  </div>
-
-                  <div
-                    style="
-                      font-size:19px;
-                      font-weight:900;
-                      margin-top:5px;
-                    "
-                  >
-                    ${escapeHtml(
-                      teamName
-                    )}
-                  </div>
-
-                </div>
-
-                <div
-                  style="
-                    display:flex;
-                    align-items:center;
-                    gap:5px;
-                    font-weight:900;
-                    font-size:14px;
-                    ${resultStyle(
-                      item.result
-                    )}
-                    white-space:nowrap;
-                  "
-                >
-
-                  <span>
-                    ${resultIcon(
-                      item.result
-                    )}
-                  </span>
-
-                  <span>
-                    ${result}
-                  </span>
-
-                </div>
-
-              </div>
-
-              <div
-                style="
-                  margin-top:14px;
-                  font-weight:700;
-                  font-size:15px;
-                "
-              >
-                ${escapeHtml(
-                  fixture
-                )}
-              </div>
-
-              ${score}
-
-              ${selectionBadge}
-
-              <div
-                style="
-                  margin-top:10px;
-                  font-size:12px;
-                  opacity:.55;
-                "
-              >
-                ${escapeHtml(
-                  kickoff
-                )}
-              </div>
-
-            </div>
-          `;
-        }
-      )
-      .join("");
+          <div style="
+            margin-top:10px;
+            font-size:12px;
+            opacity:.55
+          ">
+            ${esc(
+              formatDate(
+                x.kickoff_time
+              )
+            )}
+          </div>
+        </div>
+      `
+    ).join("");
 }
 
-async function loadHistory() {
+async function loadHistory(){
+  const c=
+    ensureHistoryView()
+      .querySelector(
+        "#historyContent"
+      );
 
-  const view =
-    ensureHistoryView();
+  c.innerHTML=`
+    <div class="empty-state">
+      Loading your history...
+    </div>
+  `;
 
-  const content =
-    view.querySelector(
-      "#historyContent"
-    );
-
-  if (content) {
-
-    content.innerHTML = `
-      <div class="empty-state">
-        Loading your history...
-      </div>
-    `;
-  }
-
-  try {
-
-    const raw =
+  try{
+    const raw=
       await callRpc(
         "get_lms_history",
         {
@@ -2723,221 +1373,146 @@ async function loadHistory() {
         }
       );
 
-    state.history =
+    state.history=
       Array.isArray(raw)
         ? raw
-        : (
-            first(raw) ||
-            []
-          );
+        : first(raw)||[];
 
     renderHistory();
 
-  } catch (error) {
+  }catch(e){
+    c.innerHTML=`
+      <div class="empty-state">
+        Could not load your history.
 
-    console.error(
-      "Load history error:",
-      error
-    );
+        <br><br>
 
-    if (content) {
-
-      content.innerHTML = `
-        <div class="empty-state">
-
-          Could not load your history.
-
-          <br><br>
-
-          ${escapeHtml(
-            error?.message ||
-            "Please try again."
-          )}
-
-        </div>
-      `;
-    }
+        ${esc(
+          e?.message||
+          "Please try again."
+        )}
+      </div>
+    `;
   }
 }
 
 
 /* =====================================================
-   NAVIGATION
+   FOUR SEPARATE PAGES
+   HOME / HISTORY / RULES / ADMIN
    ===================================================== */
 
-function setMainView(view) {
-
-  const main =
+function setMainView(view){
+  const main=
     document.querySelector(
       "main"
     );
 
-  if (!main) {
-    return;
-  }
+  if(!main)return;
 
-  const historyView =
+  const history=
     ensureHistoryView();
 
-  const rolloverNotice =
-    ensureRolloverNotice();
-
-  const nextRoundNotice =
-    ensureNextRoundNotice();
-
-  const children =
-    Array.from(
-      main.children
+  const roll=
+    ensureNotice(
+      "rolloverNotice"
     );
 
-  children.forEach(
-    (child) => {
+  const next=
+    ensureNotice(
+      "nextRoundNotice",
+      "rolloverNotice"
+    );
 
-      if (
-        child ===
-        historyView
-      ) {
-        return;
-      }
-
-      if (
-        child ===
-        rolloverNotice
-      ) {
-
-        child.style.display =
-          view === "home" &&
-          isRolloverGame()
+  Array.from(
+    main.children
+  ).forEach(
+    child=>{
+      if(child===history){
+        child.style.display=
+          view==="history"
             ? ""
             : "none";
 
         return;
       }
 
-      if (
-        child ===
-        nextRoundNotice
-      ) {
-
-        const round =
-          state.data?.current_round || {};
-
-        const start =
-          new Date(
-            round.start_time || ""
-          ).getTime();
-
-        child.style.display =
-          view === "home" &&
-          Number.isFinite(start) &&
-          ((start - Date.now()) / 3600000) > 48
-            ? ""
-            : "none";
+      if(
+        child===roll||
+        child===next
+      ){
+        child.style.display=
+          "none";
 
         return;
       }
 
-      if (
-        view ===
-        "home"
-      ) {
+      const rules=
+        child.classList.contains(
+          "rules-card"
+        );
 
-        child.style.display =
-          "";
+      if(view==="home"){
+        child.style.display=
+          rules
+            ? "none"
+            : "";
 
-      if (
-  view ===
-  "home"
-) {
+      }else if(
+        view==="rules"
+      ){
+        child.style.display=
+          rules
+            ? ""
+            : "none";
 
-  child.style.display =
-    child.classList.contains("rules-card")
-      ? "none"
-      : "";
-
-} else if (
-  view ===
-  "rules" &&
-  child.classList.contains(
-    "rules-card"
-  )
-) {
-
-  child.style.display =
-    "";
-
-} else {
-
-  child.style.display =
-    "none";
-}
+      }else{
+        child.style.display=
+          "none";
+      }
     }
   );
 
-  historyView.style.display =
-    view === "history"
-      ? ""
-      : "none";
+  if(view==="home"){
+    renderNotices();
+  }
 
-  state.activeView =
-    view;
+  state.activeView=view;
 
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  main.scrollTop=0;
 }
 
-function setupNavigation() {
-
-  const buttons =
+function setupNavigation(){
+  const buttons=
     document.querySelectorAll(
-      ".nav-item"
+      ".bottom-nav .nav-item"
     );
 
   buttons.forEach(
-    (button, index) => {
-
-      button.addEventListener(
+    (b,i)=>{
+      b.addEventListener(
         "click",
-        async () => {
-
+        async()=>{
           buttons.forEach(
-            (b) =>
-              b.classList.remove(
+            x=>
+              x.classList.remove(
                 "active"
               )
           );
 
-          button.classList.add(
+          b.classList.add(
             "active"
           );
 
-          if (
-            index === 0
-          ) {
+          if(i===0){
+            setMainView("home");
 
-            setMainView(
-              "home"
-            );
-
-          } else if (
-            index === 1
-          ) {
-
-            setMainView(
-              "history"
-            );
-
+          }else if(i===1){
+            setMainView("history");
             await loadHistory();
 
-          } else if (
-            index === 2
-          ) {
-
-            setMainView(
-              "rules"
-            );
+          }else if(i===2){
+            setMainView("rules");
           }
         }
       );
@@ -2950,25 +1525,21 @@ function setupNavigation() {
    START APP
    ===================================================== */
 
-async function startApp() {
-  let authReady = false;
+async function startApp(){
+  let ready=false;
 
-  if (window.lmsAuthReady) {
-    authReady = await window.lmsAuthReady;
+  if(window.lmsAuthReady){
+    ready=
+      await window.lmsAuthReady;
   }
 
-  if (!authReady) {
-    return;
-  }
+  if(!ready)return;
 
-  const confirmBtn =
+  const confirm=
     $("confirmBtn");
 
-  if (
-    confirmBtn
-  ) {
-
-    confirmBtn.addEventListener(
+  if(confirm){
+    confirm.addEventListener(
       "click",
       saveSelection
     );
@@ -2976,11 +1547,20 @@ async function startApp() {
 
   setupNavigation();
 
-  ensureRolloverNotice();
+  ensureHistoryView();
 
-  ensureNextRoundNotice();
+  ensureNotice(
+    "rolloverNotice"
+  );
 
-  loadPlayer(false);
+  ensureNotice(
+    "nextRoundNotice",
+    "rolloverNotice"
+  );
+
+  setMainView("home");
+
+  await loadPlayer();
 
   setInterval(
     updateCountdown,
@@ -2988,22 +1568,19 @@ async function startApp() {
   );
 
   setInterval(
-    () => loadPlayer(true),
+    ()=>loadPlayer(),
     30000
   );
 }
 
-if (
-  document.readyState ===
+if(
+  document.readyState===
   "loading"
-) {
-
+){
   document.addEventListener(
     "DOMContentLoaded",
     startApp
   );
-
-} else {
-
+}else{
   startApp();
 }
