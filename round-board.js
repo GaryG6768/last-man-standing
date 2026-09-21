@@ -963,7 +963,96 @@ function renderRoundBoard() {
 
   const data =
     roundBoardState.data;
+/*
+ * SAFE LOCAL TEST MODE
+ *
+ * This does NOT change Supabase or the live competition.
+ * It only changes what this page displays when the URL contains:
+ * ?roundboardtest=eliminated
+ */
 
+const testMode =
+  new URLSearchParams(
+    window.location.search
+  ).get("roundboardtest");
+
+
+if (
+  testMode === "eliminated"
+) {
+
+  data.revealed = true;
+
+  data.reveal_reason =
+    "deadline_passed";
+
+
+  if (
+    Array.isArray(
+      data.selections
+    )
+  ) {
+
+    data.selections =
+      data.selections.map(
+        selection => {
+
+          if (
+            String(
+              selection.player_name || ""
+            )
+              .trim()
+              .toLowerCase() ===
+            "lms test player 2"
+          ) {
+
+            return {
+              ...selection,
+
+              player_status:
+                "eliminated",
+
+              elimination_reason:
+                "Test elimination"
+            };
+
+          }
+
+          return selection;
+
+        }
+      );
+
+  }
+
+
+  const testPlayer =
+    data.selections?.find(
+      selection =>
+        String(
+          selection.player_name || ""
+        )
+          .trim()
+          .toLowerCase() ===
+        "lms test player 2"
+    );
+
+
+  data.eliminated =
+    testPlayer
+      ? [
+          {
+            player_name:
+              testPlayer.player_name,
+
+            elimination_reason:
+              "Test elimination"
+          }
+        ]
+
+      : [];
+
+}
 
   if (!data) {
 
