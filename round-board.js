@@ -2307,3 +2307,205 @@ else {
   }
 
 })();
+
+
+/* =====================================================
+   COLLAPSIBLE PUBLIC ELIMINATION ROUNDS
+   ===================================================== */
+
+(function(){
+
+  function setupCollapsibleEliminations(){
+
+    const content =
+      document.getElementById(
+        "publicEliminationsContent"
+      );
+
+    if(!content){
+      return;
+    }
+
+
+    const sections =
+      content.querySelectorAll(
+        "section"
+      );
+
+    if(!sections.length){
+      return;
+    }
+
+
+    sections.forEach(
+      function(section, index){
+
+        const header =
+          section.children[0];
+
+        const body =
+          section.children[1];
+
+        if(!header || !body){
+          return;
+        }
+
+
+        if(
+          header.dataset
+            .collapsibleReady === "1"
+        ){
+          return;
+        }
+
+
+        header.dataset
+          .collapsibleReady = "1";
+
+
+        header.style.cursor =
+          "pointer";
+
+        header.style.userSelect =
+          "none";
+
+
+        const row =
+          header.querySelector(
+            "div"
+          );
+
+        if(!row){
+          return;
+        }
+
+
+        const title =
+          row.children[0];
+
+        const count =
+          row.children[1];
+
+
+        const arrow =
+          document.createElement(
+            "span"
+          );
+
+        arrow.style.marginLeft =
+          "8px";
+
+        arrow.style.fontSize =
+          "12px";
+
+        arrow.style.opacity =
+          ".65";
+
+
+        if(title){
+
+          title.appendChild(
+            arrow
+          );
+
+        }
+
+
+        /*
+         * Latest round stays open.
+         * Older rounds start closed.
+         */
+        const open =
+          index === 0;
+
+
+        body.style.display =
+          open
+            ? "block"
+            : "none";
+
+
+        arrow.textContent =
+          open
+            ? "▼"
+            : "▶";
+
+
+        header.addEventListener(
+          "click",
+          function(){
+
+            const isOpen =
+              body.style.display !==
+              "none";
+
+
+            body.style.display =
+              isOpen
+                ? "none"
+                : "block";
+
+
+            arrow.textContent =
+              isOpen
+                ? "▶"
+                : "▼";
+
+          }
+        );
+
+      }
+    );
+
+  }
+
+
+  /*
+   * The elimination page is loaded
+   * dynamically, so watch for its
+   * contents being created.
+   */
+  function startCollapsibleWatcher(){
+
+    const observer =
+      new MutationObserver(
+        function(){
+
+          setupCollapsibleEliminations();
+
+        }
+      );
+
+
+    observer.observe(
+      document.body,
+      {
+        childList:true,
+        subtree:true
+      }
+    );
+
+
+    setupCollapsibleEliminations();
+
+  }
+
+
+  if(
+    document.readyState ===
+    "loading"
+  ){
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      startCollapsibleWatcher
+    );
+
+  }
+  else{
+
+    startCollapsibleWatcher();
+
+  }
+
+})();
