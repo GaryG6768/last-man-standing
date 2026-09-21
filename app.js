@@ -2946,9 +2946,16 @@ function setupNavigation() {
    ===================================================== */
 
 async function startApp() {
+  let authReady = false;
+
   if (window.lmsAuthReady) {
-    await window.lmsAuthReady;
+    authReady = await window.lmsAuthReady;
   }
+
+  if (!authReady) {
+    return;
+  }
+
   const confirmBtn =
     $("confirmBtn");
 
