@@ -1,2792 +1,1586 @@
-/* =====================================================
-   LAST MAN STANDING — ADMIN
-   ===================================================== */
+const SUPABASE_URL="https://tkhykusvmsceleflynok.supabase.co";
+const SUPABASE_KEY="sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
+let PLAYER_CODE=localStorage.getItem("lms_player_code")||"";
 
-const ADMIN_SUPABASE_URL =
-  "https://tkhykusvmsceleflynok.supabase.co";
+const state={
+  data:null,
+  history:[],
+  selectionTeamId:null,
+  deadline:null,
+  activeView:"home",
+  isLoading:false,
+  hasLoadedOnce:false,
+  pendingSelection:false,
+  lastLoadError:null
+};
 
-const ADMIN_SUPABASE_KEY =
-  "sb_publishable_PufAjZIn-i94mT5If1htBw_IKKLuz4B";
+const $=id=>document.getElementById(id);
 
+window.lmsSwitchPlayer=async code=>{
+  PLAYER_CODE=String(code||"").trim().toUpperCase();
+  localStorage.setItem("lms_player_code",PLAYER_CODE);
+  state.data=null;
+  state.history=[];
+  state.selectionTeamId=null;
+  state.deadline=null;
+  state.hasLoadedOnce=false;
+  state.lastLoadError=null;
+  state.pendingSelection=false;
+  await loadPlayer(false);
+};
 
-/* =====================================================
-   SUPABASE RPC
-   ===================================================== */
+async function callRpc(name,body){
+  let token=SUPABASE_KEY;
 
-async function adminCallRpc(name, body) {
+  try{
+    if(window.lmsSupabase){
+      const {data}=await window.lmsSupabase.auth.getSession();
 
-  const response =
-    await fetch(
-      `${ADMIN_SUPABASE_URL}/rest/v1/rpc/${name}`,
-      {
-        method: "POST",
-
-        headers: {
-          apikey:
-            ADMIN_SUPABASE_KEY,
-
-          Authorization:
-            `Bearer ${ADMIN_SUPABASE_KEY}`,
-
-          "Content-Type":
-            "application/json"
-        },
-
-        body:
-          JSON.stringify(body)
+      if(data?.session?.access_token){
+        token=data.session.access_token;
       }
-    );
-
-  const text =
-    await response.text();
-
-  let data;
-
-  try {
-    data =
-      text
-        ? JSON.parse(text)
-        : null;
-  } catch {
-    data = text;
+    }
+  }catch(e){
+    console.warn("Session error",e);
   }
 
-  if (!response.ok) {
+  const r=await fetch(
+    `${SUPABASE_URL}/rest/v1/rpc/${name}`,
+    {
+      method:"POST",
+      headers:{
+        apikey:SUPABASE_KEY,
+        Authorization:`Bearer ${token}`,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify(body)
+    }
+  );
 
+  const text=await r.text();
+
+  let data=null;
+
+  try{
+    data=text?JSON.parse(text):null;
+  }catch{
+    data=text;
+  }
+
+  if(!r.ok){
     throw new Error(
-      data?.message ||
-      data?.error ||
-      `Supabase error ${response.status}`
+      data?.message||
+      data?.error||
+      data?.hint||
+      `Supabase RPC error ${r.status}`
     );
   }
 
   return data;
 }
 
+const first=v=>Array.isArray(v)?v[0]:v;
+
+const money=v=>
+  Number.isFinite(Number(v))
+    ? `£${Number(v).toFixed(2)}`
+    : "£5.00";
+
+const esc=v=>
+  String(v??"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+
+function formatDate(v){
+  if(!v)return"";
+
+  const d=new Date(v);
+
+  if(Number.isNaN(d.getTime()))return"";
+
+  return d.toLocaleString(
+    "en-GB",
+    {
+      weekday:"short",
+      day:"numeric",
+      month:"short",
+      hour:"2-digit",
+      minute:"2-digit"
+    }
+  );
+}
+
+function deadlinePassed(){
+  if(!state.deadline)return false;
+
+  const t=new Date(state.deadline).getTime();
+
+  return Number.isFinite(t)&&t<=Date.now();
+}
+
+function normalise(raw){
+  const d=first(raw)||{};
+
+  return{
+    success:d.success!==false,
+    player:d.player||{},
+    competition:d.competition||{},
+    current_round:d.current_round||d.round||{},
+    selection:d.selection||null,
+    used_teams:d.used_teams||[],
+    fixtures:d.fixtures||[]
+  };
+}
+
+function paymentDue(){
+  return String(
+    state.data?.player?.status||""
+  ).toLowerCase()==="payment_due";
+}
+
+function rolloverGame(){
+  return Number(
+    state.data?.competition?.rollover_number||0
+  )>0;
+}
+
+function roundOpen(){
+  const r=state.data?.current_round||{};
+
+  const s=String(
+    state.data?.player?.status||""
+  ).toLowerCase();
+
+  return(
+    r.status==="open"&&
+    !deadlinePassed()&&
+    !["payment_due","eliminated","removed"].includes(s)
+  );
+}
+
+function homeId(f){
+  return f.home_team_id||f.home_id||f.homeTeamId||null;
+}
+
+function awayId(f){
+  return f.away_team_id||f.away_id||f.awayTeamId||null;
+}
+
+function homeName(f){
+  return(
+    f.home_name||
+    f.home_team||
+    f.home||
+    f.homeTeam||
+    "Home"
+  );
+}
+
+function awayName(f){
+  return(
+    f.away_name||
+    f.away_team||
+    f.away||
+    f.awayTeam||
+    "Away"
+  );
+}
+
+function teamName(f,id){
+  if(!f)return"Team selected";
+
+  if(
+    String(homeId(f))===
+    String(id)
+  ){
+    return homeName(f);
+  }
+
+  if(
+    String(awayId(f))===
+    String(id)
+  ){
+    return awayName(f);
+  }
+
+  return"Team selected";
+}
+
+function usedTeams(){
+  const ids=new Set();
+  const names=new Set();
+
+  (state.data?.used_teams||[])
+    .forEach(t=>{
+      if(!t)return;
+
+      if(typeof t==="string"){
+        names.add(
+          t.trim().toLowerCase()
+        );
+        return;
+      }
+
+      const id=t.team_id||t.id;
+      const n=t.team_name||t.name||t.short_name;
+
+      if(id){
+        ids.add(String(id));
+      }
+
+      if(n){
+        names.add(
+          String(n)
+            .trim()
+            .toLowerCase()
+        );
+      }
+    });
+
+  return{ids,names};
+}
+
+function isUsed(id,name,u){
+  return(
+    (id&&u.ids.has(String(id)))||
+    (
+      name&&
+      u.names.has(
+        String(name)
+          .trim()
+          .toLowerCase()
+      )
+    )
+  );
+}
+
 
 /* =====================================================
-   CREATE ADMIN VIEW
+   NOTICES
    ===================================================== */
 
-function createAdminView() {
+function ensureNotice(id,afterId){
+  let n=document.getElementById(id);
 
-  if (
-    document.getElementById(
-      "adminView"
-    )
-  ) {
+  if(n)return n;
+
+  n=document.createElement("section");
+  n.id=id;
+  n.style.display="none";
+
+  const main=document.querySelector("main");
+
+  if(main){
+    const after=
+      afterId&&
+      document.getElementById(afterId);
+
+    if(after){
+      main.insertBefore(
+        n,
+        after.nextSibling
+      );
+    }else{
+      main.insertBefore(
+        n,
+        main.firstChild
+      );
+    }
+  }
+
+  return n;
+}
+
+function renderNotices(){
+  const roll=
+    ensureNotice("rolloverNotice");
+
+  if(!rolloverGame()){
+    roll.style.display="none";
+    roll.innerHTML="";
+  }else{
+    const p=state.data?.player||{};
+    const c=state.data?.competition||{};
+
+    const n=Number(
+      p.rollover_number??
+      c.rollover_number??
+      0
+    );
+
+    const fee=
+      p.entry_fee??
+      p.rollover_entry_fee??
+      c.entry_fee??
+      5;
+
+    roll.style.display="";
+
+    roll.innerHTML=`
+      <div style="
+        background:rgba(255,255,255,.04);
+        border:1px solid rgba(255,255,255,.1);
+        border-radius:18px;
+        padding:16px 18px;
+        margin-bottom:16px
+      ">
+        <div class="muted">
+          NEW GAME
+        </div>
+
+        <div style="
+          font-size:20px;
+          font-weight:900;
+          margin-top:4px
+        ">
+          Rollover Game ${n}
+        </div>
+
+        <div style="
+          margin-top:7px;
+          opacity:.75
+        ">
+          ${
+            paymentDue()
+              ? "Payment is required before you can make a selection."
+              : "All Premier League teams are available again."
+          }
+        </div>
+
+        <div style="
+          margin-top:10px;
+          font-weight:800
+        ">
+          ${
+            paymentDue()
+              ? "PAYMENT REQUIRED"
+              : "Entry: "+money(fee)
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  const next=
+    ensureNotice(
+      "nextRoundNotice",
+      "rolloverNotice"
+    );
+
+  const r=
+    state.data?.current_round||{};
+
+  const start=
+    new Date(
+      r.start_time||""
+    ).getTime();
+
+  if(
+    !Number.isFinite(start)||
+    r.status!=="upcoming"||
+    ((start-Date.now())/3600000)<=48
+  ){
+    next.style.display="none";
+    next.innerHTML="";
+  }else{
+    const f=
+      (state.data?.fixtures||[])
+        .slice()
+        .sort(
+          (a,b)=>
+            new Date(a.kickoff_time)-
+            new Date(b.kickoff_time)
+        );
+
+    next.style.display="";
+
+    next.innerHTML=`
+      <div style="
+        background:rgba(59,130,246,.1);
+        border:1px solid rgba(96,165,250,.22);
+        border-radius:18px;
+        padding:16px 18px;
+        margin-bottom:16px
+      ">
+        <div class="muted">
+          NEXT ROUND
+        </div>
+
+        <div style="
+          font-size:21px;
+          font-weight:900;
+          margin-top:4px
+        ">
+          Round ${
+            esc(
+              r.game_round_number||
+              r.round_number||
+              ""
+            )
+          }
+        </div>
+
+        <div style="
+          margin-top:7px;
+          opacity:.75
+        ">
+          Premier League fixtures return.
+        </div>
+
+        <div style="
+          margin-top:9px;
+          color:#93c5fd;
+          font-weight:800
+        ">
+          First fixture:
+          ${esc(
+            formatDate(
+              f[0]?.kickoff_time||
+              r.start_time
+            )
+          )}
+        </div>
+      </div>
+    `;
+  }
+}
+
+
+/* =====================================================
+   DASHBOARD
+   ===================================================== */
+
+function renderDashboard(){
+  const d=state.data;
+
+  if(!d)return;
+
+  const p=d.player||{};
+  const c=d.competition||{};
+  const r=d.current_round||{};
+
+  $("playerName").textContent=
+    p.name||
+    PLAYER_CODE||
+    "Player";
+
+  const gameRound=
+    r.game_round_number||
+    (
+      Number(r.round_number)>=5
+        ? Number(r.round_number)-4
+        : Number(r.round_number)
+    );
+
+  $("roundNumber").textContent=
+    gameRound
+      ? `Round ${gameRound}`
+      : "Waiting";
+
+  let status=
+    "Waiting to start";
+
+  const ps=
+    String(
+      p.status||""
+    ).toLowerCase();
+
+  if(ps==="payment_due"){
+    status="Payment required";
+  }else if(r.status==="open"){
+    status="Choose your team";
+  }else if(r.status==="locked"){
+    status="Selections locked";
+  }else if(r.status==="in_progress"){
+    status="Round in progress";
+  }else if(r.status==="completed"){
+    status="Round completed";
+  }
+
+  const heroStatus=
+    document.querySelector(
+      ".hero-status"
+    );
+
+  if(heroStatus){
+    heroStatus.textContent=status;
+  }
+
+  const badge=
+    document.querySelector(
+      ".badge"
+    );
+
+  if(badge){
+    const s=
+      String(
+        p.status||"alive"
+      ).toUpperCase();
+
+    badge.textContent=s;
+
+    badge.className=
+      "badge "+
+      (
+        s==="ALIVE"
+          ? "alive"
+          : ""
+      );
+  }
+
+  const stats=
+    document.querySelectorAll(
+      ".stat-grid strong"
+    );
+
+  if(stats.length>=3){
+    stats[0].textContent=
+      (d.used_teams||[]).length;
+
+    stats[1].textContent=
+      p.missed_selection_count??0;
+
+    stats[2].textContent=
+      money(
+        p.entry_fee??
+        c.entry_fee
+      );
+  }
+
+  state.deadline=
+    r.selection_deadline||null;
+
+  if(!state.pendingSelection){
+    state.selectionTeamId=
+      d.selection?.team_id||
+      null;
+  }
+
+  let selected=
+    d.selection?.team_name||
+    null;
+
+  if(
+    !selected&&
+    state.selectionTeamId
+  ){
+    const f=
+      (d.fixtures||[])
+        .find(
+          x=>
+            String(homeId(x))===
+              String(state.selectionTeamId)||
+            String(awayId(x))===
+              String(state.selectionTeamId)
+        );
+
+    selected=
+      teamName(
+        f,
+        state.selectionTeamId
+      );
+  }
+
+  $("selectionTitle").textContent=
+    selected||
+    "Choose your team";
+
+  $("lockPill").textContent=
+    ps==="eliminated"
+      ? "ELIMINATED"
+      : roundOpen()
+        ? "OPEN"
+        : String(
+            r.status||
+            "WAITING"
+          ).toUpperCase();
+
+  renderNotices();
+  renderFixtures();
+
+  $("selectionHint").textContent=
+    paymentDue()
+      ? "Payment is required before you can make a selection."
+      : selected
+        ? `Your current selection is ${selected}. You can change it until the deadline.`
+        : "Choose one Premier League team to win its game.";
+
+  updateCountdown();
+}
+
+
+/* =====================================================
+   FIXTURES
+   ===================================================== */
+
+function renderFixtures(){
+  const el=$("fixtures");
+
+  const fixtures=
+    state.data?.fixtures||[];
+
+  const u=usedTeams();
+  const open=roundOpen();
+
+  if(!fixtures.length){
+    el.innerHTML=`
+      <div class="empty-state">
+        No fixtures are available for this round.
+      </div>
+    `;
+
+    $("confirmBtn").disabled=true;
+
     return;
   }
 
-  const view =
+  el.innerHTML=
+    fixtures
+      .map(f=>{
+        const hId=homeId(f);
+        const aId=awayId(f);
+        const h=homeName(f);
+        const a=awayName(f);
+        const time=formatDate(
+          f.kickoff_time
+        );
+
+        const fs=
+          f.status||
+          "scheduled";
+
+        const btn=(id,name)=>{
+          const selected=
+            state.selectionTeamId&&
+            String(
+              state.selectionTeamId
+            )===
+            String(id);
+
+          const used=
+            !selected&&
+            isUsed(
+              id,
+              name,
+              u
+            );
+
+          const unavailable=
+            fs!=="scheduled";
+
+          const disabled=
+            used||
+            unavailable||
+            !open;
+
+          let label=
+            selected
+              ? "SELECTED"
+              : used
+                ? "USED"
+                : unavailable
+                  ? String(fs).toUpperCase()
+                  : !open
+                    ? "LOCKED"
+                    : "PICK";
+
+          return`
+            <button
+              class="pick-btn ${
+                selected
+                  ? "selected"
+                  : used
+                    ? "used"
+                    : ""
+              }"
+              data-team-id="${id||""}"
+              ${disabled?"disabled":""}
+            >
+              ${label} ${esc(name)}
+            </button>
+          `;
+        };
+
+        return`
+          <div class="fixture">
+            <div
+              class="fixture-main"
+              style="width:100%"
+            >
+              <div class="fixture-teams">
+                ${esc(h)}
+                v
+                ${esc(a)}
+              </div>
+
+              <div class="fixture-time">
+                ${esc(time)}
+              </div>
+
+              <div style="
+                display:flex;
+                gap:8px;
+                flex-wrap:wrap;
+                margin-top:10px
+              ">
+                ${btn(hId,h)}
+                ${btn(aId,a)}
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+  document
+    .querySelectorAll(
+      ".pick-btn[data-team-id]"
+    )
+    .forEach(b=>{
+      b.addEventListener(
+        "click",
+        ()=>{
+          if(b.disabled)return;
+
+          state.selectionTeamId=
+            b.dataset.teamId;
+
+          state.pendingSelection=
+            true;
+
+          const f=
+            fixtures.find(
+              x=>
+                String(homeId(x))===
+                  String(state.selectionTeamId)||
+                String(awayId(x))===
+                  String(state.selectionTeamId)
+            );
+
+          const n=
+            teamName(
+              f,
+              state.selectionTeamId
+            );
+
+          $("selectionTitle")
+            .textContent=n;
+
+          $("selectionHint")
+            .textContent=
+              `Your current selection is ${n}. You can change it until the deadline.`;
+
+          $("confirmBtn").disabled=false;
+
+          $("confirmBtn").textContent=
+            "Confirm selection";
+
+          renderFixtures();
+        }
+      );
+    });
+
+  $("confirmBtn").disabled=
+    !state.selectionTeamId||
+    !open;
+}
+
+
+/* =====================================================
+   SAVE SELECTION
+   ===================================================== */
+
+async function saveSelection(){
+  if(!state.selectionTeamId)return;
+
+  if(paymentDue()){
+    $("selectionHint")
+      .textContent=
+        "Payment is required before you can make a selection.";
+
+    return;
+  }
+
+  const r=
+    state.data?.current_round;
+
+  if(!r?.id){
+    $("selectionHint")
+      .textContent=
+        "There is no open round.";
+
+    return;
+  }
+
+  const b=$("confirmBtn");
+
+  b.disabled=true;
+  b.textContent="Saving...";
+
+  try{
+    const result=
+      await callRpc(
+        "make_selection",
+        {
+          p_player_code:
+            PLAYER_CODE,
+          p_round_id:
+            r.id,
+          p_team_id:
+            state.selectionTeamId
+        }
+      );
+
+    if(result?.success===false){
+      throw new Error(
+        result.message||
+        "Selection was not saved."
+      );
+    }
+
+    state.pendingSelection=false;
+
+    await loadPlayer(false);
+
+    b.textContent=
+      "Selection saved";
+
+    b.disabled=true;
+
+    $("selectionHint")
+      .textContent=
+        "Selection saved successfully. You can change it until the deadline.";
+
+  }catch(e){
+    console.error(
+      "Selection error",
+      e
+    );
+
+    b.disabled=false;
+
+    b.textContent=
+      "Confirm selection";
+
+    $("selectionHint")
+      .textContent=
+        e?.message||
+        "Selection could not be saved.";
+  }
+}
+
+
+/* =====================================================
+   LOAD PLAYER
+   ===================================================== */
+
+async function loadPlayer(){
+  if(
+    state.isLoading||
+    !PLAYER_CODE
+  ){
+    return;
+  }
+
+  state.isLoading=true;
+
+  try{
+    let raw=null;
+    let last=null;
+
+    for(
+      let i=0;
+      i<3;
+      i++
+    ){
+      try{
+        raw=
+          await callRpc(
+            "get_lms_player_data",
+            {
+              p_player_code:
+                PLAYER_CODE
+            }
+          );
+
+        last=null;
+        break;
+
+      }catch(e){
+        last=e;
+
+        if(i<2){
+          await new Promise(
+            x=>
+              setTimeout(
+                x,
+                700*(i+1)
+              )
+          );
+        }
+      }
+    }
+
+    if(last)throw last;
+
+    const d=
+      normalise(raw);
+
+    if(!d.success){
+      throw new Error(
+        d.message||
+        "Player data could not be loaded."
+      );
+    }
+
+    state.data=d;
+    state.hasLoadedOnce=true;
+    state.lastLoadError=null;
+
+    renderDashboard();
+
+  }catch(e){
+    console.error(
+      "Load player error",
+      e
+    );
+
+    state.lastLoadError=e;
+
+    if(
+      state.hasLoadedOnce&&
+      state.data
+    ){
+      return;
+    }
+
+    if($("playerName")){
+      $("playerName")
+        .textContent=
+          "Unable to load";
+    }
+
+    if($("roundNumber")){
+      $("roundNumber")
+        .textContent=
+          "Please refresh";
+    }
+
+    const hs=
+      document.querySelector(
+        ".hero-status"
+      );
+
+    if(hs){
+      hs.textContent=
+        e?.message||
+        "Please refresh the app";
+    }
+
+    if($("selectionTitle")){
+      $("selectionTitle")
+        .textContent=
+          "Unable to load competition";
+    }
+
+    if($("fixtures")){
+      $("fixtures").innerHTML=`
+        <div class="empty-state">
+          ${esc(
+            e?.message||
+            "Could not connect to the competition."
+          )}
+        </div>
+      `;
+    }
+
+    if($("confirmBtn")){
+      $("confirmBtn").disabled=true;
+    }
+
+  }finally{
+    state.isLoading=false;
+  }
+}
+
+
+/* =====================================================
+   COUNTDOWN
+   ===================================================== */
+
+function updateCountdown(){
+  const el=$("countdown");
+
+  if(!el)return;
+
+  if(!state.deadline){
+    el.textContent="--:--:--";
+    return;
+  }
+
+  const end=
+    new Date(
+      state.deadline
+    ).getTime();
+
+  if(!Number.isFinite(end)){
+    el.textContent="--:--:--";
+    return;
+  }
+
+  const left=
+    Math.max(
+      0,
+      end-Date.now()
+    );
+
+  const s=
+    Math.floor(
+      left/1000
+    );
+
+  if(!left){
+    el.textContent=
+      "00:00:00";
+
+    return;
+  }
+
+  const d=
+    Math.floor(
+      s/86400
+    );
+
+  const h=
+    Math.floor(
+      (s%86400)/3600
+    );
+
+  const m=
+    Math.floor(
+      (s%3600)/60
+    );
+
+  const sec=
+    s%60;
+
+  el.textContent=
+    d
+      ? `${d}d ${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`
+      : `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+}
+
+
+/* =====================================================
+   HISTORY
+   ===================================================== */
+
+function ensureHistoryView(){
+  let v=
+    document.getElementById(
+      "historyView"
+    );
+
+  if(v)return v;
+
+  v=
     document.createElement(
       "section"
     );
 
-  view.id =
-    "adminView";
+  v.id="historyView";
+  v.className="rules-card";
+  v.style.display="none";
 
-  view.className =
-    "admin-page";
-
-  view.style.display =
-    "none";
-
-  view.innerHTML = `
-
+  v.innerHTML=`
     <div class="section-title">
-
       <div>
-
         <span class="muted">
-          ADMINISTRATION
+          YOUR JOURNEY
         </span>
 
-        <h2 id="adminTitle">
-          Admin Login
+        <h2>
+          Selection History
         </h2>
-
       </div>
-
     </div>
 
+    <div id="historySummary"></div>
 
-    <!-- LOGIN -->
-
-    <div id="adminLoginPanel">
-
-      <p class="hint">
-        Enter your 6-digit Admin PIN to access the management area.
-      </p>
-
-      <input
-        id="adminPin"
-        type="password"
-        inputmode="numeric"
-        maxlength="6"
-        autocomplete="off"
-        placeholder="••••••"
-        style="
-          width:100%;
-          box-sizing:border-box;
-          padding:18px;
-          margin-top:12px;
-          border-radius:16px;
-          border:1px solid rgba(255,255,255,0.12);
-          background:#0b1220;
-          color:#fff;
-          font-size:26px;
-          letter-spacing:8px;
-          text-align:center;
-          outline:none;
-        "
-      >
-
-      <button
-        id="adminLoginButton"
-        class="primary-btn"
-        style="margin-top:14px;"
-      >
-        Login
-      </button>
-
-      <p
-        class="hint"
-        id="adminMessage"
-      >
-        Admin access is protected.
-      </p>
-
+    <div id="historyContent">
+      <div class="empty-state">
+        Loading your history...
+      </div>
     </div>
-
-
-    <!-- DASHBOARD -->
-
-    <div
-      id="adminDashboard"
-      style="display:none;"
-    >
-
-
-      <!-- ADMIN HEADER -->
-
-      <div class="admin-panel">
-
-        <div class="muted">
-          ADMINISTRATOR
-        </div>
-
-        <h2>
-          Admin Dashboard
-        </h2>
-
-        <p class="hint">
-          Competition management area.
-        </p>
-
-      </div>
-
-
-      <!-- COMPETITION CONTROL -->
-
-      <div class="admin-panel">
-
-        <div class="muted">
-          COMPETITION CONTROL
-        </div>
-
-        <h2>
-          Current Competition
-        </h2>
-
-        <div
-          id="competitionControlMessage"
-          class="hint"
-        >
-          Loading competition...
-        </div>
-
-
-        <div
-          id="competitionControl"
-          style="display:none;"
-        >
-
-          <div class="control-grid">
-
-            <div class="control-item">
-
-              <div class="control-label">
-                COMPETITION
-              </div>
-
-              <div
-                id="controlCompetitionName"
-                class="control-value"
-              >
-                —
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                STATUS
-              </div>
-
-              <div
-                id="controlCompetitionStatus"
-                class="control-value"
-              >
-                —
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                CURRENT ROUND
-              </div>
-
-              <div
-                id="controlRound"
-                class="control-value"
-              >
-                —
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                ROUND STATUS
-              </div>
-
-              <div
-                id="controlRoundStatus"
-                class="control-value"
-              >
-                —
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                SELECTION DEADLINE
-              </div>
-
-              <div
-                id="controlDeadline"
-                class="control-value"
-              >
-                —
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                PLAYERS
-              </div>
-
-              <div
-                id="controlPlayers"
-                class="control-value"
-              >
-                —
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                ALIVE
-              </div>
-
-              <div
-                id="controlAlive"
-                class="control-value"
-              >
-                —
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                PAID
-              </div>
-
-              <div
-                id="controlPaid"
-                class="control-value"
-              >
-                —
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                PRIZE POT
-              </div>
-
-              <div
-                id="controlPrizePot"
-                class="control-value"
-              >
-                £0.00
-              </div>
-
-            </div>
-
-
-            <div class="control-item">
-
-              <div class="control-label">
-                ROLLOVER
-              </div>
-
-              <div
-                id="controlRollover"
-                class="control-value"
-              >
-                0
-              </div>
-
-            </div>
-
-          </div>
-
-
-          <button
-            id="refreshCompetitionButton"
-            class="primary-btn"
-          >
-            Refresh Competition
-          </button>
-
-
-          <button
-            id="lockRoundButton"
-            class="primary-btn"
-            style="margin-top:12px;"
-          >
-            🔒 Lock Round Now
-          </button>
-
-
-          <p
-            id="lockRoundMessage"
-            class="hint"
-          >
-            The round will also lock automatically after the deadline.
-          </p>
-
-        </div>
-
-      </div>
-
-
-      <!-- ADD PLAYER -->
-
-      <div class="admin-panel">
-
-        <div class="muted">
-          PLAYER MANAGEMENT
-        </div>
-
-        <h2>
-          Add Player
-        </h2>
-
-        <p class="hint">
-          Add a player to this competition.
-          New players start as PAYMENT DUE.
-        </p>
-
-
-        <input
-          id="newPlayerName"
-          type="text"
-          autocomplete="off"
-          placeholder="Player name"
-          class="admin-input"
-        >
-
-
-        <input
-          id="newPlayerCode"
-          type="text"
-          autocomplete="off"
-          autocapitalize="characters"
-          placeholder="Player code e.g. JOHN"
-          class="admin-input"
-        >
-
-
-        <button
-          id="addPlayerButton"
-          class="primary-btn"
-        >
-          Add Player
-        </button>
-
-
-        <p
-          id="addPlayerMessage"
-          class="hint"
-        >
-          Enter the player's name and code.
-        </p>
-
-      </div>
-
-
-      <!-- PLAYERS -->
-
-      <div class="admin-panel">
-
-        <div class="admin-panel-heading">
-
-          <div>
-
-            <div class="muted">
-              COMPETITION
-            </div>
-
-            <h2>
-              Players
-            </h2>
-
-          </div>
-
-          <strong
-            id="playerCount"
-            style="font-size:24px;"
-          >
-            —
-          </strong>
-
-        </div>
-
-
-        <p
-          id="playersMessage"
-          class="hint"
-        >
-          Loading players...
-        </p>
-
-
-        <div
-          id="playersList"
-        ></div>
-
-
-        <button
-          id="refreshPlayersButton"
-          class="primary-btn"
-        >
-          Refresh Players
-        </button>
-
-      </div>
-
-
-      <!-- LOGOUT -->
-
-      <button
-        id="adminLogoutButton"
-        class="primary-btn"
-      >
-        Log out
-      </button>
-
-    </div>
-
   `;
 
+  document
+    .querySelector("main")
+    ?.appendChild(v);
 
-  /*
-   * IMPORTANT:
-   *
-   * Admin remains outside <main> so the existing
-   * Home / History / Rules navigation cannot
-   * accidentally display the Admin page.
-   *
-   * It is now positioned as a proper full app page.
-   */
-
-  const shell =
-    document.querySelector(
-      ".app-shell"
-    );
-
-  const nav =
-    document.querySelector(
-      ".bottom-nav"
-    );
-
-  if (
-    shell &&
-    nav
-  ) {
-
-    shell.insertBefore(
-      view,
-      nav
-    );
-
-  }
-
-
-  addAdminStyles();
-
-  setupAdminControls();
+  return v;
 }
 
-
-/* =====================================================
-   ADMIN STYLES
-   ===================================================== */
-
-function addAdminStyles() {
-
-  if (
-    document.getElementById(
-      "adminExtraStyles"
-    )
-  ) {
-    return;
-  }
-
-
-  const style =
-    document.createElement(
-      "style"
-    );
-
-  style.id =
-    "adminExtraStyles";
-
-
-  style.textContent = `
-
-    /*
-     * ADMIN IS NOW A REAL APP PAGE.
-     *
-     * It sits between the top header and
-     * bottom navigation instead of being
-     * pushed underneath the main page.
-     */
-
-    .admin-page {
-
-      position:absolute;
-
-      top:96px;
-
-      left:0;
-
-      right:0;
-
-      bottom:72px;
-
-      z-index:50;
-
-      box-sizing:border-box;
-
-      overflow-y:auto;
-
-      overflow-x:hidden;
-
-      padding:
-        0 14px 30px;
-
-      -webkit-overflow-scrolling:touch;
-
-      overscroll-behavior-y:contain;
-
-      background:#0b1220;
-
-    }
-
-
-    .admin-page > .section-title {
-
-      margin-top:18px;
-
-    }
-
-
-    .admin-panel {
-
-      margin-top:18px;
-
-      background:
-        rgba(255,255,255,0.04);
-
-      border:
-        1px solid
-        rgba(255,255,255,0.08);
-
-      border-radius:18px;
-
-      padding:20px;
-
-    }
-
-
-    .admin-panel-heading {
-
-      display:flex;
-
-      justify-content:space-between;
-
-      align-items:center;
-
-      gap:12px;
-
-    }
-
-
-    .admin-input {
-
-      width:100%;
-
-      box-sizing:border-box;
-
-      padding:16px;
-
-      margin-top:10px;
-
-      border-radius:14px;
-
-      border:
-        1px solid
-        rgba(255,255,255,0.12);
-
-      background:#0b1220;
-
-      color:#fff;
-
-      font-size:17px;
-
-      outline:none;
-
-    }
-
-
-    .admin-panel >
-    .primary-btn {
-
-      margin-top:12px;
-
-    }
-
-
-    .admin-player {
-
-      padding:16px;
-
-      margin-bottom:12px;
-
-      border-radius:16px;
-
-      background:
-        rgba(255,255,255,0.035);
-
-      border:
-        1px solid
-        rgba(255,255,255,0.07);
-
-    }
-
-
-    .admin-player-top {
-
-      display:flex;
-
-      justify-content:space-between;
-
-      align-items:flex-start;
-
-      gap:12px;
-
-    }
-
-
-    .admin-player-name {
-
-      font-size:18px;
-
-      font-weight:700;
-
-    }
-
-
-    .admin-player-code {
-
-      margin-top:4px;
-
-      font-size:13px;
-
-      opacity:.6;
-
-    }
-
-
-    .admin-status {
-
-      padding:7px 10px;
-
-      border-radius:999px;
-
-      background:
-        rgba(255,255,255,0.07);
-
-      font-size:12px;
-
-      font-weight:700;
-
-      white-space:nowrap;
-
-    }
-
-
-    .admin-stats {
-
-      display:grid;
-
-      grid-template-columns:
-        1fr 1fr;
-
-      gap:12px;
-
-      margin-top:15px;
-
-    }
-
-
-    .admin-stat-label {
-
-      font-size:11px;
-
-      text-transform:uppercase;
-
-      opacity:.5;
-
-    }
-
-
-    .admin-stat-value {
-
-      margin-top:3px;
-
-      font-weight:600;
-
-    }
-
-
-    .mark-paid-btn {
-
-      width:100%;
-
-      margin-top:15px;
-
-    }
-
-
-    .control-grid {
-
-      display:grid;
-
-      grid-template-columns:
-        1fr 1fr;
-
-      gap:10px;
-
-      margin-top:16px;
-
-    }
-
-
-    .control-item {
-
-      padding:13px;
-
-      border-radius:14px;
-
-      background:
-        rgba(255,255,255,0.035);
-
-      border:
-        1px solid
-        rgba(255,255,255,0.06);
-
-    }
-
-
-    .control-label {
-
-      font-size:10px;
-
-      text-transform:uppercase;
-
-      letter-spacing:.05em;
-
-      opacity:.5;
-
-    }
-
-
-    .control-value {
-
-      margin-top:5px;
-
-      font-size:15px;
-
-      font-weight:700;
-
-    }
-
-
-    @media (max-width:380px) {
-
-      .control-grid {
-
-        grid-template-columns:1fr;
-
-      }
-
-    }
-
-  `;
-
-
-  document.head.appendChild(
-    style
+function resultLabel(v){
+  v=
+    String(
+      v||
+      "pending"
+    ).toLowerCase();
+
+  return(
+    v==="win"
+      ? "WIN"
+      : v==="draw"
+        ? "DRAW"
+        : v==="loss"
+          ? "LOSS"
+          : v==="through"
+            ? "THROUGH"
+            : v==="abandoned"
+              ? "ABANDONED"
+              : v==="postponed"
+                ? "POSTPONED"
+                : "PENDING"
   );
 }
 
+function resultColor(v){
+  v=
+    String(
+      v||""
+    ).toLowerCase();
 
-/* =====================================================
-   ADMIN NAVIGATION
-   ===================================================== */
+  return(
+    v==="win"||
+    v==="through"
+      ? "#86efac"
+      : v==="loss"
+        ? "#fca5a5"
+        : v==="draw"
+          ? "#fcd34d"
+          : "#cbd5e1"
+  );
+}
 
-function createAdminNav() {
+function renderHistory(){
+  const v=
+    ensureHistoryView();
 
-  const nav =
-    document.querySelector(
-      ".bottom-nav"
+  const c=
+    v.querySelector(
+      "#historyContent"
     );
 
-  if (!nav) {
-    return;
-  }
-
-
-  if (
-    document.getElementById(
-      "adminNavButton"
+  const h=
+    Array.isArray(
+      state.history
     )
-  ) {
+      ? state.history
+      : [];
+
+  if(!h.length){
+    c.innerHTML=`
+      <div
+        class="empty-state"
+        style="
+          padding:30px;
+          text-align:center
+        "
+      >
+        🏆
+        <br><br>
+
+        <strong>
+          Your journey starts here
+        </strong>
+
+        <br><br>
+
+        Your completed rounds
+        will appear here.
+      </div>
+    `;
+
     return;
   }
 
+  const wins=
+    h.filter(
+      x=>
+        ["win","through"]
+          .includes(
+            String(
+              x.result||""
+            ).toLowerCase()
+          )
+    ).length;
 
-  const button =
-    document.createElement(
-      "button"
-    );
+  const losses=
+    h.filter(
+      x=>
+        String(
+          x.result||""
+        ).toLowerCase()==="loss"
+    ).length;
 
-  button.id =
-    "adminNavButton";
+  const automatic=
+    h.filter(
+      x=>
+        String(
+          x.selection_type||""
+        ).toLowerCase()==="automatic"
+    ).length;
 
-  button.className =
-    "nav-item";
+  document.getElementById(
+    "historySummary"
+  ).innerHTML=`
+    <div style="
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+      margin:14px 0 18px
+    ">
+      <div class="stat-grid">
+        <strong>${wins}</strong>
+        <span>Through</span>
+      </div>
 
+      <div class="stat-grid">
+        <strong>${losses}</strong>
+        <span>Losses</span>
+      </div>
 
-  button.innerHTML = `
-
-    <span>
-      ⚙
-    </span>
-
-    <small>
-      Admin
-    </small>
-
+      <div class="stat-grid">
+        <strong>${automatic}</strong>
+        <span>Automatic</span>
+      </div>
+    </div>
   `;
 
+  c.innerHTML=
+    h.map(
+      x=>`
+        <div style="
+          background:rgba(255,255,255,.04);
+          border:1px solid rgba(255,255,255,.08);
+          border-radius:18px;
+          padding:17px;
+          margin-bottom:12px
+        ">
+          <div style="
+            display:flex;
+            justify-content:space-between;
+            gap:12px
+          ">
+            <div>
+              <div class="muted">
+                ROUND ${esc(
+                  x.round_number||"?"
+                )}
+              </div>
 
-  button.addEventListener(
-    "click",
-    () => {
+              <div style="
+                font-size:19px;
+                font-weight:900;
+                margin-top:5px
+              ">
+                ${esc(
+                  x.team_name||
+                  "Team"
+                )}
+              </div>
+            </div>
 
-      const adminView =
-        document.getElementById(
-          "adminView"
-        );
+            <div style="
+              font-weight:900;
+              color:${resultColor(
+                x.result
+              )}
+            ">
+              ${resultLabel(
+                x.result
+              )}
+            </div>
+          </div>
 
-      if (!adminView) {
+          <div style="
+            margin-top:14px;
+            font-weight:700
+          ">
+            ${esc(
+              x.fixture||
+              "Fixture"
+            )}
+          </div>
+
+          ${
+            x.home_score!=null&&
+            x.away_score!=null
+              ? `
+                <div style="
+                  font-size:26px;
+                  font-weight:900;
+                  margin-top:10px
+                ">
+                  ${esc(x.home_score)}
+                  -
+                  ${esc(x.away_score)}
+                </div>
+              `
+              : ""
+          }
+
+          <div style="
+            margin-top:10px;
+            font-size:12px;
+            opacity:.55
+          ">
+            ${esc(
+              formatDate(
+                x.kickoff_time
+              )
+            )}
+          </div>
+        </div>
+      `
+    ).join("");
+}
+
+async function loadHistory(){
+  const c=
+    ensureHistoryView()
+      .querySelector(
+        "#historyContent"
+      );
+
+  c.innerHTML=`
+    <div class="empty-state">
+      Loading your history...
+    </div>
+  `;
+
+  try{
+    const raw=
+      await callRpc(
+        "get_lms_history",
+        {
+          p_player_code:
+            PLAYER_CODE
+        }
+      );
+
+    state.history=
+      Array.isArray(raw)
+        ? raw
+        : first(raw)||[];
+
+    renderHistory();
+
+  }catch(e){
+    c.innerHTML=`
+      <div class="empty-state">
+        Could not load your history.
+
+        <br><br>
+
+        ${esc(
+          e?.message||
+          "Please try again."
+        )}
+      </div>
+    `;
+  }
+}
+
+
+/* =====================================================
+   FOUR SEPARATE PAGES
+   HOME / HISTORY / RULES / ADMIN
+   ===================================================== */
+
+function setMainView(view){
+  const main=
+    document.querySelector(
+      "main"
+    );
+
+  if(!main)return;
+
+  const history=
+    ensureHistoryView();
+
+  const roll=
+    ensureNotice(
+      "rolloverNotice"
+    );
+
+  const next=
+    ensureNotice(
+      "nextRoundNotice",
+      "rolloverNotice"
+    );
+
+  Array.from(
+    main.children
+  ).forEach(
+    child=>{
+      if(child===history){
+        child.style.display=
+          view==="history"
+            ? ""
+            : "none";
+
         return;
       }
 
+      if(
+        child===roll||
+        child===next
+      ){
+        child.style.display=
+          "none";
 
-      const main =
-        document.querySelector(
-          "main"
+        return;
+      }
+
+      const rules=
+        child.classList.contains(
+          "rules-card"
         );
 
+      if(view==="home"){
+        child.style.display=
+          rules
+            ? "none"
+            : "";
 
-      /*
-       * Hide the normal application page.
-       */
+      }else if(
+        view==="rules"
+      ){
+        child.style.display=
+          rules
+            ? ""
+            : "none";
 
-      if (main) {
+      }else{
+        child.style.display=
+          "none";
+      }
+    }
+  );
 
-        Array.from(
-          main.children
-        ).forEach(
-          child => {
+  if(view==="home"){
+    renderNotices();
+  }
 
-            child.style.display =
-              "none";
+  state.activeView=view;
 
+  main.scrollTop=0;
+}
+
+function setupNavigation(){
+  const buttons=
+    document.querySelectorAll(
+      ".bottom-nav .nav-item"
+    );
+
+  buttons.forEach(
+    (b,i)=>{
+      b.addEventListener(
+        "click",
+        async()=>{
+          buttons.forEach(
+            x=>
+              x.classList.remove(
+                "active"
+              )
+          );
+
+          b.classList.add(
+            "active"
+          );
+
+          if(i===0){
+            setMainView("home");
+
+          }else if(i===1){
+            setMainView("history");
+            await loadHistory();
+
+          }else if(i===2){
+            setMainView("rules");
           }
-        );
-
-      }
-
-
-      /*
-       * Show Admin.
-       */
-
-      adminView.style.display =
-        "";
-
-
-      /*
-       * Make Admin the active button.
-       */
-
-      document
-        .querySelectorAll(
-          ".bottom-nav .nav-item"
-        )
-        .forEach(
-          item =>
-            item.classList.remove(
-              "active"
-            )
-        );
-
-
-      button.classList.add(
-        "active"
+        }
       );
-
-
-      /*
-       * Show the correct login/dashboard
-       * state.
-       */
-
-      showAdminDashboard();
-
-
-      /*
-       * Load live Admin information
-       * when already logged in.
-       */
-
-      if (
-        sessionStorage.getItem(
-          "lms_admin_token"
-        )
-      ) {
-
-        loadPlayers();
-
-        loadCompetitionControl();
-
-      }
-
     }
   );
-
-
-  nav.appendChild(
-    button
-  );
-
-
-  /*
-   * When Home, History or Rules is pressed,
-   * hide the Admin page.
-   */
-
-  nav
-    .querySelectorAll(
-      ".nav-item"
-    )
-    .forEach(
-      item => {
-
-        if (
-          item === button
-        ) {
-          return;
-        }
-
-
-        item.addEventListener(
-          "click",
-          () => {
-
-            const adminView =
-              document.getElementById(
-                "adminView"
-              );
-
-            if (adminView) {
-
-              adminView.style.display =
-                "none";
-
-            }
-
-
-            button.classList.remove(
-              "active"
-            );
-
-          }
-        );
-
-      }
-    );
 }
 
 
 /* =====================================================
-   CONTROLS
+   START APP
    ===================================================== */
 
-function setupAdminControls() {
+async function startApp(){
+  let ready=false;
 
-  const login =
-    document.getElementById(
-      "adminLoginButton"
-    );
+  if(window.lmsAuthReady){
+    ready=
+      await window.lmsAuthReady;
+  }
 
-  const pin =
-    document.getElementById(
-      "adminPin"
-    );
+  if(!ready)return;
 
-  const logout =
-    document.getElementById(
-      "adminLogoutButton"
-    );
+  const confirm=
+    $("confirmBtn");
 
-  const refresh =
-    document.getElementById(
-      "refreshPlayersButton"
-    );
-
-  const refreshCompetition =
-    document.getElementById(
-      "refreshCompetitionButton"
-    );
-
-  const addPlayer =
-    document.getElementById(
-      "addPlayerButton"
-    );
-
-  const lockRound =
-    document.getElementById(
-      "lockRoundButton"
-    );
-
-
-  if (login) {
-
-    login.addEventListener(
+  if(confirm){
+    confirm.addEventListener(
       "click",
-      adminLogin
+      saveSelection
     );
-
   }
 
+  setupNavigation();
 
-  if (pin) {
+  ensureHistoryView();
 
-    pin.addEventListener(
-      "keydown",
-      event => {
-
-        if (
-          event.key === "Enter"
-        ) {
-
-          adminLogin();
-
-        }
-
-      }
-    );
-
-  }
-
-
-  if (logout) {
-
-    logout.addEventListener(
-      "click",
-      adminLogout
-    );
-
-  }
-
-
-  if (refresh) {
-
-    refresh.addEventListener(
-      "click",
-      loadPlayers
-    );
-
-  }
-
-
-  if (refreshCompetition) {
-
-    refreshCompetition.addEventListener(
-      "click",
-      loadCompetitionControl
-    );
-
-  }
-
-
-  if (addPlayer) {
-
-    addPlayer.addEventListener(
-      "click",
-      addNewPlayer
-    );
-
-  }
-
-
-  if (lockRound) {
-
-    lockRound.addEventListener(
-      "click",
-      adminLockCurrentRound
-    );
-
-  }
-
-}
-
-
-/* =====================================================
-   LOGIN
-   ===================================================== */
-
-async function adminLogin() {
-
-  const pin =
-    document.getElementById(
-      "adminPin"
-    );
-
-  const button =
-    document.getElementById(
-      "adminLoginButton"
-    );
-
-  const message =
-    document.getElementById(
-      "adminMessage"
-    );
-
-
-  const value =
-    pin?.value.trim() || "";
-
-
-  if (
-    !/^[0-9]{6}$/.test(
-      value
-    )
-  ) {
-
-    message.textContent =
-      "Please enter your 6-digit Admin PIN.";
-
-    return;
-  }
-
-
-  button.disabled =
-    true;
-
-  button.textContent =
-    "Checking...";
-
-
-  try {
-
-    const raw =
-      await adminCallRpc(
-        "admin_login",
-        {
-          p_pin:
-            value
-        }
-      );
-
-
-    const result =
-      Array.isArray(raw)
-        ? raw[0]
-        : raw;
-
-
-    if (
-      !result?.success ||
-      !result?.session_token
-    ) {
-
-      throw new Error(
-        result?.message ||
-        "Incorrect PIN."
-      );
-
-    }
-
-
-    sessionStorage.setItem(
-      "lms_admin_token",
-      result.session_token
-    );
-
-
-    pin.value =
-      "";
-
-
-    showAdminDashboard();
-
-
-    await loadPlayers();
-
-    await loadCompetitionControl();
-
-
-  } catch (error) {
-
-    console.error(
-      error
-    );
-
-
-    message.textContent =
-      error?.message ||
-      "Admin login failed.";
-
-
-  } finally {
-
-    button.disabled =
-      false;
-
-    button.textContent =
-      "Login";
-
-  }
-
-}
-
-
-/* =====================================================
-   SHOW DASHBOARD
-   ===================================================== */
-
-function showAdminDashboard() {
-
-  const loggedIn =
-    !!sessionStorage.getItem(
-      "lms_admin_token"
-    );
-
-
-  const loginPanel =
-    document.getElementById(
-      "adminLoginPanel"
-    );
-
-  const dashboard =
-    document.getElementById(
-      "adminDashboard"
-    );
-
-  const title =
-    document.getElementById(
-      "adminTitle"
-    );
-
-
-  if (loginPanel) {
-
-    loginPanel.style.display =
-      loggedIn
-        ? "none"
-        : "";
-
-  }
-
-
-  if (dashboard) {
-
-    dashboard.style.display =
-      loggedIn
-        ? ""
-        : "none";
-
-  }
-
-
-  if (title) {
-
-    title.textContent =
-      loggedIn
-        ? "Admin Dashboard"
-        : "Admin Login";
-
-  }
-
-}
-
-
-/* =====================================================
-   LOGOUT
-   ===================================================== */
-
-function adminLogout() {
-
-  sessionStorage.removeItem(
-    "lms_admin_token"
+  ensureNotice(
+    "rolloverNotice"
   );
 
-
-  const dashboard =
-    document.getElementById(
-      "adminDashboard"
-    );
-
-  const loginPanel =
-    document.getElementById(
-      "adminLoginPanel"
-    );
-
-  const adminView =
-    document.getElementById(
-      "adminView"
-    );
-
-
-  if (dashboard) {
-
-    dashboard.style.display =
-      "none";
-
-  }
-
-
-  if (loginPanel) {
-
-    loginPanel.style.display =
-      "";
-
-  }
-
-
-  if (adminView) {
-
-    adminView.style.display =
-      "";
-
-  }
-
-}
-
-
-/* =====================================================
-   COMPETITION CONTROL
-   ===================================================== */
-
-async function loadCompetitionControl() {
-
-  const token =
-    sessionStorage.getItem(
-      "lms_admin_token"
-    );
-
-
-  if (!token) {
-    return;
-  }
-
-
-  const message =
-    document.getElementById(
-      "competitionControlMessage"
-    );
-
-  const panel =
-    document.getElementById(
-      "competitionControl"
-    );
-
-  const refresh =
-    document.getElementById(
-      "refreshCompetitionButton"
-    );
-
-
-  if (message) {
-
-    message.textContent =
-      "Loading competition...";
-
-  }
-
-
-  if (panel) {
-
-    panel.style.display =
-      "none";
-
-  }
-
-
-  if (refresh) {
-
-    refresh.disabled =
-      true;
-
-    refresh.textContent =
-      "Loading...";
-
-  }
-
-
-  try {
-
-    const raw =
-      await adminCallRpc(
-        "admin_get_competition_control",
-        {
-          p_session_token:
-            token
-        }
-      );
-
-
-    const result =
-      Array.isArray(raw)
-        ? raw[0]
-        : raw;
-
-
-    if (!result?.success) {
-
-      throw new Error(
-        result?.message ||
-        "Unable to load competition."
-      );
-
-    }
-
-
-    const competition =
-      result.competition || {};
-
-    const round =
-      result.round;
-
-    const players =
-      result.players || {};
-
-
-    const competitionName =
-      document.getElementById(
-        "controlCompetitionName"
-      );
-
-    if (competitionName) {
-
-      competitionName.textContent =
-        competition.name || "—";
-
-    }
-
-
-    const competitionStatus =
-      document.getElementById(
-        "controlCompetitionStatus"
-      );
-
-    if (competitionStatus) {
-
-      competitionStatus.textContent =
-        formatCompetitionStatus(
-          competition.status
-        );
-
-    }
-
-
-    const controlRound =
-      document.getElementById(
-        "controlRound"
-      );
-
-    if (controlRound) {
-
-      controlRound.textContent =
-        round
-          ? `Round ${round.round_number}`
-          : "No active round";
-
-    }
-
-
-    const roundStatus =
-      document.getElementById(
-        "controlRoundStatus"
-      );
-
-    if (roundStatus) {
-
-      roundStatus.textContent =
-        round
-          ? formatRoundStatus(
-              round.status
-            )
-          : "—";
-
-    }
-
-
-    const lockButton =
-      document.getElementById(
-        "lockRoundButton"
-      );
-
-
-    if (lockButton) {
-
-      lockButton.dataset.roundId =
-        round?.id || "";
-
-      lockButton.style.display =
-        round?.status === "open"
-          ? ""
-          : "none";
-
-    }
-
-
-    const deadline =
-      document.getElementById(
-        "controlDeadline"
-      );
-
-    if (deadline) {
-
-      deadline.textContent =
-        round
-          ? formatAdminDateTime(
-              round.selection_deadline
-            )
-          : "—";
-
-    }
-
-
-    const totalPlayers =
-      document.getElementById(
-        "controlPlayers"
-      );
-
-    if (totalPlayers) {
-
-      totalPlayers.textContent =
-        Number(
-          players.total || 0
-        );
-
-    }
-
-
-    const alive =
-      document.getElementById(
-        "controlAlive"
-      );
-
-    if (alive) {
-
-      alive.textContent =
-        Number(
-          players.alive || 0
-        );
-
-    }
-
-
-    const paid =
-      document.getElementById(
-        "controlPaid"
-      );
-
-    if (paid) {
-
-      paid.textContent =
-        Number(
-          players.paid || 0
-        );
-
-    }
-
-
-    const prize =
-      document.getElementById(
-        "controlPrizePot"
-      );
-
-    if (prize) {
-
-      prize.textContent =
-        `£${Number(
-          competition.prize_pot || 0
-        ).toFixed(2)}`;
-
-    }
-
-
-    const rollover =
-      document.getElementById(
-        "controlRollover"
-      );
-
-    if (rollover) {
-
-      rollover.textContent =
-        Number(
-          competition.rollover_number || 0
-        );
-
-    }
-
-
-    if (panel) {
-
-      panel.style.display =
-        "";
-
-    }
-
-
-    if (message) {
-
-      message.textContent =
-        round
-          ? "Current competition information."
-          : "There is currently no active round.";
-
-    }
-
-
-  } catch (error) {
-
-    console.error(
-      "Competition control:",
-      error
-    );
-
-
-    if (message) {
-
-      message.textContent =
-        error?.message ||
-        "Unable to load competition.";
-
-    }
-
-  } finally {
-
-    if (refresh) {
-
-      refresh.disabled =
-        false;
-
-      refresh.textContent =
-        "Refresh Competition";
-
-    }
-
-  }
-
-}
-
-
-/* =====================================================
-   MANUAL ROUND LOCK
-   ===================================================== */
-
-async function adminLockCurrentRound() {
-
-  const token =
-    sessionStorage.getItem(
-      "lms_admin_token"
-    );
-
-  const button =
-    document.getElementById(
-      "lockRoundButton"
-    );
-
-  const message =
-    document.getElementById(
-      "lockRoundMessage"
-    );
-
-  const roundId =
-    button?.dataset.roundId || "";
-
-
-  if (!token) {
-
-    if (message) {
-
-      message.textContent =
-        "Admin session expired. Please log in again.";
-
-    }
-
-    return;
-  }
-
-
-  if (!roundId) {
-
-    if (message) {
-
-      message.textContent =
-        "There is no open round available to lock.";
-
-    }
-
-    return;
-  }
-
-
-  const confirmed =
-    window.confirm(
-      "Lock the current round now? All player selections will be finalised."
-    );
-
-
-  if (!confirmed) {
-    return;
-  }
-
-
-  button.disabled =
-    true;
-
-  button.textContent =
-    "Locking...";
-
-
-  if (message) {
-
-    message.textContent =
-      "Locking round and finalising selections...";
-
-  }
-
-
-  try {
-
-    const raw =
-      await adminCallRpc(
-        "admin_lock_round",
-        {
-          p_session_token:
-            token,
-
-          p_round_id:
-            roundId
-        }
-      );
-
-
-    const result =
-      Array.isArray(raw)
-        ? raw[0]
-        : raw;
-
-
-    if (!result?.success) {
-
-      throw new Error(
-        result?.message ||
-        "Round could not be locked."
-      );
-
-    }
-
-
-    if (message) {
-
-      message.textContent =
-        result.message ||
-        "Round locked successfully.";
-
-    }
-
-
-    await loadCompetitionControl();
-
-    await loadPlayers();
-
-
-  } catch (error) {
-
-    console.error(
-      "Manual round lock:",
-      error
-    );
-
-
-    if (message) {
-
-      message.textContent =
-        error?.message ||
-        "Round could not be locked.";
-
-    }
-
-
-    button.disabled =
-      false;
-
-    button.textContent =
-      "🔒 Lock Round Now";
-
-  }
-
-}
-
-
-/* =====================================================
-   ADD PLAYER
-   ===================================================== */
-
-async function addNewPlayer() {
-
-  const nameInput =
-    document.getElementById(
-      "newPlayerName"
-    );
-
-  const codeInput =
-    document.getElementById(
-      "newPlayerCode"
-    );
-
-  const button =
-    document.getElementById(
-      "addPlayerButton"
-    );
-
-  const message =
-    document.getElementById(
-      "addPlayerMessage"
-    );
-
-
-  const token =
-    sessionStorage.getItem(
-      "lms_admin_token"
-    );
-
-
-  const name =
-    nameInput?.value.trim() || "";
-
-
-  const code =
-    codeInput?.value
-      .trim()
-      .toUpperCase() || "";
-
-
-  if (!name) {
-
-    message.textContent =
-      "Please enter the player's name.";
-
-    return;
-  }
-
-
-  if (!code) {
-
-    message.textContent =
-      "Please enter a player code.";
-
-    return;
-  }
-
-
-  button.disabled =
-    true;
-
-  button.textContent =
-    "Adding...";
-
-
-  try {
-
-    const adminInfo =
-      await adminCallRpc(
-        "admin_get_players",
-        {
-          p_session_token:
-            token
-        }
-      );
-
-
-    const competitionId =
-      adminInfo?.competition_id;
-
-
-    if (!competitionId) {
-
-      throw new Error(
-        "Could not determine the competition."
-      );
-
-    }
-
-
-    await adminCallRpc(
-      "admin_add_player",
-      {
-        p_competition_id:
-          competitionId,
-
-        p_name:
-          name,
-
-        p_player_code:
-          code
-      }
-    );
-
-
-    nameInput.value =
-      "";
-
-    codeInput.value =
-      "";
-
-
-    message.textContent =
-      "Player added successfully. Payment is now due.";
-
-
-    await loadPlayers();
-
-    await loadCompetitionControl();
-
-
-  } catch (error) {
-
-    console.error(
-      error
-    );
-
-
-    message.textContent =
-      error?.message ||
-      "Player could not be added.";
-
-
-  } finally {
-
-    button.disabled =
-      false;
-
-    button.textContent =
-      "Add Player";
-
-  }
-
-}
-
-
-/* =====================================================
-   LOAD PLAYERS
-   ===================================================== */
-
-async function loadPlayers() {
-
-  const token =
-    sessionStorage.getItem(
-      "lms_admin_token"
-    );
-
-
-  if (!token) {
-    return;
-  }
-
-
-  const message =
-    document.getElementById(
-      "playersMessage"
-    );
-
-  const count =
-    document.getElementById(
-      "playerCount"
-    );
-
-  const list =
-    document.getElementById(
-      "playersList"
-    );
-
-  const refresh =
-    document.getElementById(
-      "refreshPlayersButton"
-    );
-
-
-  if (refresh) {
-
-    refresh.disabled =
-      true;
-
-    refresh.textContent =
-      "Loading...";
-
-  }
-
-
-  try {
-
-    const raw =
-      await adminCallRpc(
-        "admin_get_players",
-        {
-          p_session_token:
-            token
-        }
-      );
-
-
-    const result =
-      Array.isArray(raw)
-        ? raw[0]
-        : raw;
-
-
-    if (!result?.success) {
-
-      throw new Error(
-        result?.message ||
-        "Unable to load players."
-      );
-
-    }
-
-
-    const players =
-      result.players || [];
-
-
-    if (count) {
-
-      count.textContent =
-        players.length;
-
-    }
-
-
-    if (message) {
-
-      message.textContent =
-        `${players.length} players in this competition.`;
-
-    }
-
-
-    renderPlayers(
-      players
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      error
-    );
-
-
-    if (message) {
-
-      message.textContent =
-        error?.message ||
-        "Unable to load players.";
-
-    }
-
-  } finally {
-
-    if (refresh) {
-
-      refresh.disabled =
-        false;
-
-      refresh.textContent =
-        "Refresh Players";
-
-    }
-
-  }
-
-}
-
-
-/* =====================================================
-   RENDER PLAYERS
-   ===================================================== */
-
-function renderPlayers(
-  players
-) {
-
-  const list =
-    document.getElementById(
-      "playersList"
-    );
-
-
-  if (!list) {
-    return;
-  }
-
-
-  list.innerHTML =
-    players
-      .map(
-        player => {
-
-          const status =
-            String(
-              player.status ||
-              "unknown"
-            ).toLowerCase();
-
-
-          const payment =
-            `£${Number(
-              player.paid_amount || 0
-            ).toFixed(2)}`;
-
-
-          const missed =
-            Number(
-              player.missed_selection_count || 0
-            );
-
-
-          const rollover =
-            Number(
-              player.rollover_number || 0
-            );
-
-
-          const entryFee =
-            Number(
-              player.rollover_entry_fee ??
-              5
-            );
-
-
-          const statusLabel =
-            formatPlayerStatus(
-              status
-            );
-
-
-          const markPaid =
-            status === "payment_due"
-
-              ? `
-
-                <button
-                  class="primary-btn mark-paid-btn"
-                  data-player-id="${player.id}"
-                  data-payment-amount="${entryFee.toFixed(2)}"
-                >
-                  MARK PAID £${entryFee.toFixed(2)}
-                </button>
-
-              `
-
-              : "";
-
-
-          return `
-
-            <div class="admin-player">
-
-              <div class="admin-player-top">
-
-                <div>
-
-                  <div class="admin-player-name">
-
-                    ${escapeAdminHtml(
-                      player.name
-                    )}
-
-                  </div>
-
-
-                  <div class="admin-player-code">
-
-                    Code:
-
-                    ${escapeAdminHtml(
-                      player.player_code
-                    )}
-
-                  </div>
-
-                </div>
-
-
-                <div class="admin-status">
-
-                  ${statusLabel}
-
-                </div>
-
-              </div>
-
-
-              <div class="admin-stats">
-
-                <div>
-
-                  <div class="admin-stat-label">
-                    Payment
-                  </div>
-
-                  <div class="admin-stat-value">
-                    ${payment}
-                  </div>
-
-                </div>
-
-
-                <div>
-
-                  <div class="admin-stat-label">
-                    Missed
-                  </div>
-
-                  <div class="admin-stat-value">
-                    ${missed}
-                  </div>
-
-                </div>
-
-
-                <div>
-
-                  <div class="admin-stat-label">
-                    Rollover
-                  </div>
-
-                  <div class="admin-stat-value">
-                    ${rollover}
-                  </div>
-
-                </div>
-
-
-                <div>
-
-                  <div class="admin-stat-label">
-                    Joined
-                  </div>
-
-                  <div class="admin-stat-value">
-                    ${formatAdminDate(
-                      player.joined_at
-                    )}
-                  </div>
-
-                </div>
-
-              </div>
-
-
-              ${markPaid}
-
-            </div>
-
-          `;
-
-        }
-      )
-      .join("");
-
-
-  list
-    .querySelectorAll(
-      ".mark-paid-btn"
-    )
-    .forEach(
-      button => {
-
-        button.addEventListener(
-          "click",
-          () => {
-
-            markPlayerPaid(
-              button.dataset.playerId,
-              button
-            );
-
-          }
-        );
-
-      }
-    );
-
-}
-
-
-/* =====================================================
-   MARK PLAYER PAID
-   ===================================================== */
-
-async function markPlayerPaid(
-  playerId,
-  button
-) {
-
-  const paymentAmount =
-    Number(
-      button?.dataset.paymentAmount ||
-      5
-    );
-
-
-  const confirmed =
-    window.confirm(
-      `Mark this player as PAID and record the £${paymentAmount.toFixed(2)} entry payment?`
-    );
-
-
-  if (!confirmed) {
-    return;
-  }
-
-
-  button.disabled =
-    true;
-
-  button.textContent =
-    "MARKING PAID...";
-
-
-  try {
-
-    const raw =
-      await adminCallRpc(
-        "admin_mark_paid",
-        {
-          p_player_id:
-            playerId
-        }
-      );
-
-
-    const result =
-      Array.isArray(raw)
-        ? raw[0]
-        : raw;
-
-
-    if (
-      result &&
-      result.success === false
-    ) {
-
-      throw new Error(
-        result.message ||
-        "Payment could not be recorded."
-      );
-
-    }
-
-
-    await loadPlayers();
-
-    await loadCompetitionControl();
-
-
-  } catch (error) {
-
-    console.error(
-      error
-    );
-
-
-    alert(
-      error?.message ||
-      "Payment could not be recorded."
-    );
-
-
-    button.disabled =
-      false;
-
-    button.textContent =
-      `MARK PAID £${paymentAmount.toFixed(2)}`;
-
-  }
-
-}
-
-
-/* =====================================================
-   STATUS HELPERS
-   ===================================================== */
-
-function formatPlayerStatus(
-  status
-) {
-
-  const labels = {
-
-    paid:
-      "PAID",
-
-    alive:
-      "ALIVE",
-
-    eliminated:
-      "ELIMINATED",
-
-    winner:
-      "WINNER",
-
-    payment_due:
-      "PAYMENT DUE",
-
-    paused:
-      "PAUSED",
-
-    removed:
-      "REMOVED"
-
-  };
-
-
-  return (
-    labels[status] ||
-    status.toUpperCase()
+  ensureNotice(
+    "nextRoundNotice",
+    "rolloverNotice"
   );
 
-}
+  setMainView("home");
 
+  await loadPlayer();
 
-function formatCompetitionStatus(
-  status
-) {
-
-  const labels = {
-
-    setup:
-      "SETUP",
-
-    active:
-      "ACTIVE",
-
-    paused:
-      "PAUSED",
-
-    rollover:
-      "ROLLOVER",
-
-    complete:
-      "COMPLETE"
-
-  };
-
-
-  const value =
-    String(
-      status ||
-      "unknown"
-    ).toLowerCase();
-
-
-  return (
-    labels[value] ||
-    value.toUpperCase()
+  setInterval(
+    updateCountdown,
+    1000
   );
 
-}
-
-
-function formatRoundStatus(
-  status
-) {
-
-  const labels = {
-
-    upcoming:
-      "UPCOMING",
-
-    open:
-      "OPEN",
-
-    locked:
-      "LOCKED",
-
-    in_progress:
-      "IN PROGRESS",
-
-    completed:
-      "COMPLETED",
-
-    abandoned:
-      "ABANDONED"
-
-  };
-
-
-  const value =
-    String(
-      status ||
-      "unknown"
-    ).toLowerCase();
-
-
-  return (
-    labels[value] ||
-    value.toUpperCase()
+  setInterval(
+    ()=>loadPlayer(),
+    30000
   );
-
 }
 
-
-/* =====================================================
-   DATE HELPERS
-   ===================================================== */
-
-function formatAdminDate(
-  value
-) {
-
-  if (!value) {
-    return "—";
-  }
-
-
-  const date =
-    new Date(
-      value
-    );
-
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-
-    return "—";
-
-  }
-
-
-  return date.toLocaleDateString(
-    "en-GB",
-    {
-      day:
-        "2-digit",
-
-      month:
-        "short",
-
-      year:
-        "numeric"
-    }
-  );
-
-}
-
-
-function formatAdminDateTime(
-  value
-) {
-
-  if (!value) {
-    return "—";
-  }
-
-
-  const date =
-    new Date(
-      value
-    );
-
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-
-    return "—";
-
-  }
-
-
-  return date.toLocaleString(
-    "en-GB",
-    {
-      day:
-        "2-digit",
-
-      month:
-        "short",
-
-      year:
-        "numeric",
-
-      hour:
-        "2-digit",
-
-      minute:
-        "2-digit"
-    }
-  );
-
-}
-
-
-/* =====================================================
-   HTML SAFETY
-   ===================================================== */
-
-function escapeAdminHtml(
-  value
-) {
-
-  return String(
-    value ?? ""
-  )
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-    .replace(
-      /</g,
-      "&lt;"
-    )
-    .replace(
-      />/g,
-      "&gt;"
-    )
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-    .replace(
-      /'/g,
-      "&#039;"
-    );
-
-}
-
-
-/* =====================================================
-   START
-   ===================================================== */
-
-function startAdmin() {
-
-  createAdminView();
-
-  createAdminNav();
-
-  showAdminDashboard();
-
-}
-
-
-if (
-  document.readyState ===
+if(
+  document.readyState===
   "loading"
-) {
-
+){
   document.addEventListener(
     "DOMContentLoaded",
-    startAdmin
+    startApp
   );
-
-} else {
-
-  startAdmin();
-
+}else{
+  startApp();
 }
