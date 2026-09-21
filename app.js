@@ -1108,10 +1108,18 @@ function renderDashboard() {
     player.name ||
     PLAYER_CODE;
 
-  $("roundNumber").textContent =
-    round.round_number
-      ? `Round ${round.round_number}`
-      : "Waiting";
+  const gameRoundNumber =
+  round.game_round_number ||
+  (
+    Number(round.round_number) >= 5
+      ? Number(round.round_number) - 4
+      : Number(round.round_number)
+  );
+
+$("roundNumber").textContent =
+  gameRoundNumber
+    ? `Round ${gameRoundNumber}`
+    : "Waiting";
 
   let statusText =
     "Waiting to start";
