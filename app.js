@@ -354,10 +354,15 @@ function renderNotices(){
   }
 
   const next=
-    ensureNotice(
-      "nextRoundNotice",
-      "rolloverNotice"
-    );
+  ensureNotice(
+    "nextRoundNotice",
+    "rolloverNotice"
+  );
+
+const roundBoard =
+  document.getElementById(
+    "roundBoard"
+  );
 
   const r=
     state.data?.current_round||{};
@@ -1417,7 +1422,16 @@ function setMainView(view){
 
         return;
       }
+if(
+  child===roundBoard
+){
+  child.style.display=
+    view==="roundBoard"
+      ? ""
+      : "none";
 
+  return;
+}
       const rules=
         child.classList.contains(
           "rules-card"
