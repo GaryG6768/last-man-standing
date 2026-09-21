@@ -2845,22 +2845,32 @@ function setMainView(view) {
         child.style.display =
           "";
 
-      } else if (
-        view ===
-        "rules" &&
-        child.classList.contains(
-          "rules-card"
-        )
-      ) {
+      if (
+  view ===
+  "home"
+) {
 
-        child.style.display =
-          "";
+  child.style.display =
+    child.classList.contains("rules-card")
+      ? "none"
+      : "";
 
-      } else {
+} else if (
+  view ===
+  "rules" &&
+  child.classList.contains(
+    "rules-card"
+  )
+) {
 
-        child.style.display =
-          "none";
-      }
+  child.style.display =
+    "";
+
+} else {
+
+  child.style.display =
+    "none";
+}
     }
   );
 
