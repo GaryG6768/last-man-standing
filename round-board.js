@@ -2415,7 +2415,7 @@ else {
          * Latest round stays open.
          * Older rounds start closed.
          */
-        const open =
+        const open = false
           index === 0;
 
 
