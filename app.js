@@ -891,8 +891,9 @@ function renderNextRoundNotice() {
   */
 
   if (
-    hoursUntil <= 48
-  ) {
+  round.status !== "upcoming" ||
+  hoursUntil <= 48
+) {
 
     notice.style.display =
       "none";
