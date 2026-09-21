@@ -1048,7 +1048,24 @@
       )
       .onclick =
       () => overlay.remove();
+    document
+      .getElementById(
+        "lms-logout-player"
+      )
+      .onclick =
+      async function () {
 
+        const confirmed =
+          confirm(
+            "Are you sure you want to log out?"
+          );
+
+        if (!confirmed) {
+          return;
+        }
+
+        await window.lmsLogoutPlayer();
+      };
 
     document
       .getElementById(
