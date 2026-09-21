@@ -1144,7 +1144,26 @@
 
 
           message.textContent =
-            "Verified. Enter your new code below.";
+  "Verified. Loading your game...";
+
+message.style.color =
+  "#166534";
+
+setTimeout(
+  function () {
+
+    window.location.href =
+      window.location.pathname +
+      "?player=" +
+      encodeURIComponent(
+        identity.player_code
+      ) +
+      "&refresh=" +
+      Date.now();
+
+  },
+  400
+);
 
 
           message.style.color =
