@@ -1001,6 +1001,23 @@
         ></div>
 
 
+                <button
+          id="lms-logout-player"
+          style="
+            width:100%;
+            margin-top:12px;
+            padding:14px;
+            border:0;
+            border-radius:10px;
+            background:#dc2626;
+            color:white;
+            font-weight:800;
+          "
+        >
+          LOG OUT
+        </button>
+
+
         <button
           id="lms-security-close"
           style="
