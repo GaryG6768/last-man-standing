@@ -1327,12 +1327,7 @@ $("roundNumber").textContent =
     selectedTeamName ||
     "Choose your team";
 
-  const playerStatus =
-  String(
-    state.data?.player?.status || ""
-  ).toLowerCase();
-
-$("lockPill")
+  $("lockPill")
   .textContent =
   playerStatus === "eliminated"
     ? "ELIMINATED"
