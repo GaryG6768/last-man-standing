@@ -479,12 +479,93 @@ function createAdminView() {
 
   if (shell && nav) {
     shell.insertBefore(view, nav);
+
+    positionAdminView();
+
+    window.addEventListener(
+      "resize",
+      positionAdminView
+    );
   }
 
 
   addAdminStyles();
 
   setupAdminControls();
+}
+
+
+/* =====================================================
+   ADMIN VIEW POSITIONING
+   ===================================================== */
+
+function positionAdminView() {
+
+  const view =
+    document.getElementById(
+      "adminView"
+    );
+
+  const shell =
+    document.querySelector(
+      ".app-shell"
+    );
+
+  const topbar =
+    document.querySelector(
+      ".topbar"
+    );
+
+  const nav =
+    document.querySelector(
+      ".bottom-nav"
+    );
+
+  if (
+    !view ||
+    !shell ||
+    !topbar ||
+    !nav
+  ) {
+    return;
+  }
+
+  const top =
+    topbar.offsetHeight;
+
+  const bottom =
+    nav.offsetHeight;
+
+  shell.style.position =
+    "relative";
+
+  view.style.position =
+    "absolute";
+
+  view.style.left =
+    "0";
+
+  view.style.right =
+    "0";
+
+  view.style.top =
+    top + "px";
+
+  view.style.bottom =
+    bottom + "px";
+
+  view.style.margin =
+    "0";
+
+  view.style.overflowY =
+    "auto";
+
+  view.style.overflowX =
+    "hidden";
+
+  view.style.paddingBottom =
+    "24px";
+
 }
 
 
@@ -719,6 +800,14 @@ function createAdminNav() {
 
 
       adminView.style.display = "";
+
+      positionAdminView();
+
+      if (main) {
+        main.scrollTop = 0;
+      }
+
+      adminView.scrollTop = 0;
 
 
       document
@@ -1801,21 +1890,6 @@ function renderPlayers(players) {
             player.rollover_number || 0
           );
 
-
-        /*
-         * The backend now supplies the correct
-         * entry fee for this player.
-         *
-         * Normal game:
-         *   £5
-         *
-         * Rollover:
-         *   Existing player = £5
-         *   New player = rollover new-player fee
-         *
-         * Use 5 as a safe fallback for older
-         * player records.
-         */
 
         const entryFee =
           Number(
