@@ -1327,9 +1327,16 @@ $("roundNumber").textContent =
     selectedTeamName ||
     "Choose your team";
 
-  $("lockPill")
-    .textContent =
-    roundIsOpen()
+  const playerStatus =
+  String(
+    state.data?.player?.status || ""
+  ).toLowerCase();
+
+$("lockPill")
+  .textContent =
+  playerStatus === "eliminated"
+    ? "ELIMINATED"
+    : roundIsOpen()
       ? "OPEN"
       : String(
           round.status ||
