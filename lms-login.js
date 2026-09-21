@@ -12,10 +12,6 @@
   let supabaseClient = null;
 
 
-  /* =====================================================
-     LOCAL PLAYER CODE
-     ===================================================== */
-
   function getSavedCode() {
     return (
       localStorage.getItem(CODE_KEY) || ""
@@ -23,6 +19,7 @@
       .trim()
       .toUpperCase();
   }
+
 
   function saveCode(code) {
     localStorage.setItem(
@@ -33,14 +30,11 @@
     );
   }
 
+
   function clearCode() {
     localStorage.removeItem(CODE_KEY);
   }
 
-
-  /* =====================================================
-     LOGIN SCREEN
-     ===================================================== */
 
   function showLogin() {
 
@@ -149,7 +143,6 @@
           LAST MAN STANDING
         </div>
 
-
         <div
           style="
             font-size:16px;
@@ -159,7 +152,6 @@
         >
           Secure player login
         </div>
-
 
         <button
           id="lms-passkey-button"
@@ -178,7 +170,6 @@
           USE FACE ID / FINGERPRINT
         </button>
 
-
         <div
           style="
             margin:18px 0;
@@ -189,7 +180,6 @@
         >
           FIRST-TIME SETUP
         </div>
-
 
         <input
           id="lms-login-code"
@@ -214,7 +204,6 @@
           "
         />
 
-
         <button
           id="lms-login-button"
           style="
@@ -232,7 +221,6 @@
         >
           SET UP SECURE LOGIN
         </button>
-
 
         <div
           id="lms-login-error"
@@ -292,10 +280,6 @@
   }
 
 
-  /* =====================================================
-     SUPABASE RPC
-     ===================================================== */
-
   async function callRpc(
     name,
     body
@@ -318,10 +302,6 @@
   }
 
 
-  /* =====================================================
-     GET CURRENT PLAYER
-     ===================================================== */
-
   async function getIdentity() {
 
     const result =
@@ -339,10 +319,6 @@
     return result;
   }
 
-
-  /* =====================================================
-     FIRST LOGIN — AUTH BRIDGE
-     ===================================================== */
 
   async function establishBridgeSession(
     code
@@ -419,10 +395,6 @@
   }
 
 
-  /* =====================================================
-     REGISTER PASSKEY
-     ===================================================== */
-
   async function registerPasskey() {
 
     if (
@@ -452,10 +424,6 @@
     return data;
   }
 
-
-  /* =====================================================
-     FIRST-TIME SECURE SETUP
-     ===================================================== */
 
   async function firstTimeSetup() {
 
@@ -526,9 +494,9 @@
       const {
         error
       } =
-        await supabaseClient.rpc(
-          "mark_lms_passkey_enrolled"
-        );
+      await supabaseClient.rpc(
+        "mark_lms_passkey_enrolled"
+      );
 
 
       if (error) {
@@ -548,21 +516,22 @@
       );
 
 
-      setTimeout(
-        function () {
+      hideLogin();
 
-          window.location.href =
-            window.location.pathname +
-            "?player=" +
-            encodeURIComponent(
-              code
-            ) +
-            "&refresh=" +
-            Date.now();
 
-        },
-        400
-      );
+      if (
+        window.lmsSwitchPlayer
+      ) {
+
+        await window.lmsSwitchPlayer(
+          code
+        );
+
+      } else {
+
+        window.location.reload();
+
+      }
 
 
     } catch (err) {
@@ -602,10 +571,6 @@
   }
 
 
-  /* =====================================================
-     PASSKEY LOGIN
-     ===================================================== */
-
   async function signInWithPasskey() {
 
     const button =
@@ -634,8 +599,8 @@
       const {
         error
       } =
-        await supabaseClient.auth
-          .signInWithPasskey();
+      await supabaseClient.auth
+        .signInWithPasskey();
 
 
       if (error) {
@@ -665,21 +630,32 @@
       );
 
 
-      setTimeout(
-        function () {
+      /*
+       * IMPORTANT:
+       *
+       * Do NOT reload the page here.
+       *
+       * The authenticated Supabase session is
+       * already active. Tell the existing app
+       * to load this player immediately.
+       */
 
-          window.location.href =
-            window.location.pathname +
-            "?player=" +
-            encodeURIComponent(
-              identity.player_code
-            ) +
-            "&refresh=" +
-            Date.now();
+      hideLogin();
 
-        },
-        300
-      );
+
+      if (
+        window.lmsSwitchPlayer
+      ) {
+
+        await window.lmsSwitchPlayer(
+          identity.player_code
+        );
+
+      } else {
+
+        window.location.reload();
+
+      }
 
 
     } catch (err) {
@@ -708,10 +684,6 @@
     }
   }
 
-
-  /* =====================================================
-     RESTORE EXISTING SESSION
-     ===================================================== */
 
   async function restoreExistingSession() {
 
@@ -752,10 +724,6 @@
     return identity;
   }
 
-
-  /* =====================================================
-     SECURITY BUTTON
-     ===================================================== */
 
   function addSecurityButton() {
 
@@ -826,10 +794,6 @@
     );
   }
 
-
-  /* =====================================================
-     SECURITY SETTINGS
-     ===================================================== */
 
   function openSecuritySettings() {
 
@@ -1001,7 +965,7 @@
         ></div>
 
 
-                <button
+        <button
           id="lms-logout-player"
           style="
             width:100%;
@@ -1048,6 +1012,8 @@
       )
       .onclick =
       () => overlay.remove();
+
+
     document
       .getElementById(
         "lms-logout-player"
@@ -1067,6 +1033,7 @@
         await window.lmsLogoutPlayer();
       };
 
+
     document
       .getElementById(
         "lms-verify-security"
@@ -1077,11 +1044,6 @@
         const verify =
           document.getElementById(
             "lms-verify-security"
-          );
-
-        const area =
-          document.getElementById(
-            "lms-new-code-area"
           );
 
         const message =
@@ -1105,8 +1067,8 @@
           const {
             error
           } =
-            await supabaseClient.auth
-              .signInWithPasskey();
+          await supabaseClient.auth
+            .signInWithPasskey();
 
 
           if (error) {
@@ -1131,10 +1093,6 @@
           );
 
 
-          area.style.display =
-            "block";
-
-
           verify.textContent =
             "VERIFIED";
 
@@ -1144,30 +1102,42 @@
 
 
           message.textContent =
-  "Verified. Loading your game...";
-
-message.style.color =
-  "#166534";
-
-setTimeout(
-  function () {
-
-    window.location.href =
-      window.location.pathname +
-      "?player=" +
-      encodeURIComponent(
-        identity.player_code
-      ) +
-      "&refresh=" +
-      Date.now();
-
-  },
-  400
-);
-
+            "Verified. Loading your game...";
 
           message.style.color =
             "#166534";
+
+
+          /*
+           * IMPORTANT:
+           * Do not reload the page.
+           * The authenticated session is already
+           * available to app.js.
+           */
+
+          if (
+            window.lmsSwitchPlayer
+          ) {
+
+            await window.lmsSwitchPlayer(
+              identity.player_code
+            );
+
+          } else {
+
+            window.location.reload();
+
+          }
+
+
+          setTimeout(
+            function () {
+
+              overlay.remove();
+
+            },
+            300
+          );
 
 
         } catch (err) {
@@ -1250,13 +1220,13 @@ setTimeout(
             data,
             error
           } =
-            await supabaseClient.rpc(
-              "change_lms_player_code",
-              {
-                p_new_code:
-                  newCode
-              }
-            );
+          await supabaseClient.rpc(
+            "change_lms_player_code",
+            {
+              p_new_code:
+                newCode
+            }
+          );
 
 
           if (error) {
@@ -1288,7 +1258,7 @@ setTimeout(
 
 
           setTimeout(
-            function () {
+            async function () {
 
               overlay.remove();
 
@@ -1296,7 +1266,7 @@ setTimeout(
                 window.lmsSwitchPlayer
               ) {
 
-                window.lmsSwitchPlayer(
+                await window.lmsSwitchPlayer(
                   newCode
                 );
 
@@ -1332,10 +1302,6 @@ setTimeout(
   }
 
 
-  /* =====================================================
-     INITIALISE
-     ===================================================== */
-
   async function initialise() {
 
     createLoginScreen();
@@ -1346,9 +1312,9 @@ setTimeout(
       const {
         createClient
       } =
-        await import(
-          "https://esm.sh/@supabase/supabase-js@2.105.4"
-        );
+      await import(
+        "https://esm.sh/@supabase/supabase-js@2.105.4"
+      );
 
 
       supabaseClient =
@@ -1380,29 +1346,33 @@ setTimeout(
 
 
       const identity =
-  await restoreExistingSession();
+        await restoreExistingSession();
 
-const savedCode =
-  getSavedCode();
 
-if (
-  identity &&
-  identity.passkey_enrolled === true
-) {
+      const savedCode =
+        getSavedCode();
 
-  hideLogin();
 
-  return true;
-}
+      if (
+        identity &&
+        identity.passkey_enrolled === true
+      ) {
 
-if (identity) {
+        hideLogin();
 
-  await supabaseClient.auth.signOut({
-    scope: "local"
-  });
-}
+        return true;
+      }
 
-showLogin();
+
+      if (identity) {
+
+        await supabaseClient.auth.signOut({
+          scope: "local"
+        });
+      }
+
+
+      showLogin();
 
 
       setLoginMessage(
@@ -1439,7 +1409,7 @@ showLogin();
 
   window.lmsAuthReady =
     initialise();
-  
+
 
   window.lmsShowLogin =
     function () {
