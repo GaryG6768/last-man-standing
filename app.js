@@ -1729,10 +1729,18 @@ async function saveSelection() {
     }
 
     state.pendingSelection =
-      false;
+  false;
+
+while (state.isLoading) {
+  await new Promise(
+    (resolve) => setTimeout(resolve, 100)
+  );
+}
+
 await loadPlayer(false);
-    button.textContent =
-      "Selection saved";
+
+button.textContent =
+  "Selection saved";
 
     button.disabled =
       true;
