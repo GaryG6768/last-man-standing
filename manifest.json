@@ -1,0 +1,19 @@
+{
+  "name": "Last Man Standing",
+  "short_name": "LMS",
+  "description": "Last Man Standing football challenge",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [
+    {
+      "src": "lms-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
