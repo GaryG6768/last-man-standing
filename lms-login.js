@@ -1420,7 +1420,7 @@ showLogin();
 
   window.lmsAuthReady =
     initialise();
-
+  
 
   window.lmsShowLogin =
     function () {
