@@ -192,17 +192,11 @@ function awayName(f){
 function teamName(f,id){
   if(!f)return"Team selected";
 
-  if(
-    String(homeId(f))===
-    String(id)
-  ){
+  if(String(homeId(f))===String(id)){
     return homeName(f);
   }
 
-  if(
-    String(awayId(f))===
-    String(id)
-  ){
+  if(String(awayId(f))===String(id)){
     return awayName(f);
   }
 
@@ -256,11 +250,6 @@ function isUsed(id,name,u){
     )
   );
 }
-
-
-/* =====================================================
-   NOTICES
-   ===================================================== */
 
 function ensureNotice(id,afterId){
   let n=document.getElementById(id);
@@ -448,11 +437,6 @@ function renderNotices(){
   }
 }
 
-
-/* =====================================================
-   DASHBOARD
-   ===================================================== */
-
 function renderDashboard(){
   const d=state.data;
 
@@ -588,15 +572,16 @@ function renderDashboard(){
     selected||
     "Choose your team";
 
-  $("lockPill").textContent=
-    ps==="eliminated"
-      ? "ELIMINATED"
-      : roundOpen()
-        ? "OPEN"
-        : String(
-            r.status||
-            "WAITING"
-          ).toUpperCase();
+  $("lockPill")
+    .textContent=
+      ps==="eliminated"
+        ? "ELIMINATED"
+        : roundOpen()
+          ? "OPEN"
+          : String(
+              r.status||
+              "WAITING"
+            ).toUpperCase();
 
   renderNotices();
   renderFixtures();
@@ -610,11 +595,6 @@ function renderDashboard(){
 
   updateCountdown();
 }
-
-
-/* =====================================================
-   FIXTURES
-   ===================================================== */
 
 function renderFixtures(){
   const el=$("fixtures");
@@ -788,11 +768,6 @@ function renderFixtures(){
     !open;
 }
 
-
-/* =====================================================
-   SAVE SELECTION
-   ===================================================== */
-
 async function saveSelection(){
   if(!state.selectionTeamId)return;
 
@@ -843,7 +818,7 @@ async function saveSelection(){
 
     state.pendingSelection=false;
 
-    await loadPlayer(false);
+    await loadPlayer();
 
     b.textContent=
       "Selection saved";
@@ -872,16 +847,28 @@ async function saveSelection(){
   }
 }
 
-
-/* =====================================================
-   LOAD PLAYER
-   ===================================================== */
-
 async function loadPlayer(){
-  if(
-    state.isLoading||
-    !PLAYER_CODE
-  ){
+  if(state.isLoading){
+    return;
+  }
+
+  /*
+   * CRITICAL FIX:
+   * Get the player code AFTER lms-login.js
+   * has finished restoring the secure session.
+   */
+  PLAYER_CODE=
+    (
+      localStorage.getItem(
+        "lms_player_code"
+      )||
+      PLAYER_CODE||
+      ""
+    )
+      .trim()
+      .toUpperCase();
+
+  if(!PLAYER_CODE){
     return;
   }
 
@@ -1006,11 +993,6 @@ async function loadPlayer(){
   }
 }
 
-
-/* =====================================================
-   COUNTDOWN
-   ===================================================== */
-
 function updateCountdown(){
   const el=$("countdown");
 
@@ -1072,11 +1054,6 @@ function updateCountdown(){
       ? `${d}d ${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`
       : `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
 }
-
-
-/* =====================================================
-   HISTORY
-   ===================================================== */
 
 function ensureHistoryView(){
   let v=
@@ -1396,12 +1373,6 @@ async function loadHistory(){
   }
 }
 
-
-/* =====================================================
-   FOUR SEPARATE PAGES
-   HOME / HISTORY / RULES / ADMIN
-   ===================================================== */
-
 function setMainView(view){
   const main=
     document.querySelector(
@@ -1520,12 +1491,8 @@ function setupNavigation(){
   );
 }
 
-
-/* =====================================================
-   START APP
-   ===================================================== */
-
 async function startApp(){
+
   let ready=false;
 
   if(window.lmsAuthReady){
@@ -1534,6 +1501,29 @@ async function startApp(){
   }
 
   if(!ready)return;
+
+  /*
+   * CRITICAL FIX:
+   * The login script may only have written
+   * LMS001 to localStorage moments ago.
+   * Read it again now.
+   */
+  PLAYER_CODE=
+    (
+      localStorage.getItem(
+        "lms_player_code"
+      )||
+      ""
+    )
+      .trim()
+      .toUpperCase();
+
+  if(!PLAYER_CODE){
+    console.warn(
+      "No LMS player code available after secure login."
+    );
+    return;
+  }
 
   const confirm=
     $("confirmBtn");
