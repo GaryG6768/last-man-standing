@@ -971,55 +971,6 @@ function renderRoundBoard() {
  * ?roundboardtest=eliminated
  */
 
-const testMode = new URLSearchParams(window.location.search).get("roundboardtest");
-
-  /*
-   * SAFE LOCAL TEST MODE
-   *
-   * This does NOT change Supabase or the live competition.
-   * It only changes what the Round Board displays when the URL contains:
-   * ?roundboardtest=eliminated
-   */
-
-  if (testMode === "eliminated" && data) {
-
-    data.revealed = true;
-    data.reveal_reason = "deadline_passed";
-
-    if (Array.isArray(data.selections) && data.selections.length > 0) {
-
-      const testSelection = data.selections[0];
-
-      data.selections = data.selections.map((selection, index) => {
-
-        if (index === 0) {
-          return {
-            ...selection,
-            player_status: "eliminated",
-            elimination_reason: "TEST ONLY — not a real elimination"
-          };
-        }
-
-        return selection;
-
-      });
-
-      data.eliminated = [
-        {
-          player_id: testSelection.player_id,
-          player_name: testSelection.player_name,
-          elimination_reason: "TEST ONLY — not a real elimination"
-        }
-      ];
-
-    } else {
-
-      data.eliminated = [];
-
-    }
-
-  }
-      
 
   if (!data) {
 
