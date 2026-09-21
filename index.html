@@ -550,7 +550,13 @@
 <script src="app.js?v=20"></script>
 <script src="admin.js?v=14"></script>
 <script src="round-board.js?v=10"></script>
-
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function() {
+    navigator.serviceWorker.register("./service-worker.js");
+  });
+}
+</script>
 </body>
 
 </html>
