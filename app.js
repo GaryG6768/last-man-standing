@@ -1730,7 +1730,7 @@ async function saveSelection() {
 
     state.pendingSelection =
       false;
-
+await loadPlayer(false);
     button.textContent =
       "Selection saved";
 
