@@ -237,16 +237,10 @@ function isPaymentDue() {
 }
 
 function isRolloverGame() {
-  const player =
-    state.data?.player || {};
-
   const competition =
     state.data?.competition || {};
 
   return (
-    Number(
-      player.rollover_number || 0
-    ) > 0 ||
     Number(
       competition.rollover_number || 0
     ) > 0
