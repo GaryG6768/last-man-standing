@@ -132,7 +132,6 @@ function createAdminView() {
       style="display:none;"
     >
 
-
       <!-- ADMIN HEADER -->
 
       <div class="admin-panel">
@@ -441,9 +440,7 @@ function createAdminView() {
         </p>
 
 
-        <div
-          id="playersList"
-        ></div>
+        <div id="playersList"></div>
 
 
         <button
@@ -470,102 +467,45 @@ function createAdminView() {
   `;
 
 
-  const shell =
-    document.querySelector(".app-shell");
+  /*
+   * IMPORTANT:
+   *
+   * Admin now lives INSIDE the existing main
+   * scrolling area.
+   *
+   * This means it uses exactly the same vertical
+   * space as Home / History / Rules.
+   *
+   * No absolute positioning.
+   * No calculated top offset.
+   * No calculated bottom offset.
+   */
 
-  const nav =
-    document.querySelector(".bottom-nav");
+  const main =
+    document.querySelector("main");
 
+  if (main) {
 
-  if (shell && nav) {
-    shell.insertBefore(view, nav);
+    main.appendChild(view);
 
-    positionAdminView();
+  } else {
 
-    window.addEventListener(
-      "resize",
-      positionAdminView
-    );
+    const shell =
+      document.querySelector(".app-shell");
+
+    const nav =
+      document.querySelector(".bottom-nav");
+
+    if (shell && nav) {
+      shell.insertBefore(view, nav);
+    }
+
   }
 
 
   addAdminStyles();
 
   setupAdminControls();
-}
-
-
-/* =====================================================
-   ADMIN VIEW POSITIONING
-   ===================================================== */
-
-function positionAdminView() {
-
-  const view =
-    document.getElementById(
-      "adminView"
-    );
-
-  const shell =
-    document.querySelector(
-      ".app-shell"
-    );
-
-  const topbar =
-    document.querySelector(
-      ".topbar"
-    );
-
-  const nav =
-    document.querySelector(
-      ".bottom-nav"
-    );
-
-  if (
-    !view ||
-    !shell ||
-    !topbar ||
-    !nav
-  ) {
-    return;
-  }
-
-  const top =
-    topbar.offsetHeight;
-
-  const bottom =
-    nav.offsetHeight;
-
-  shell.style.position =
-    "relative";
-
-  view.style.position =
-    "absolute";
-
-  view.style.left =
-    "0";
-
-  view.style.right =
-    "0";
-
-  view.style.top =
-    top + "px";
-
-  view.style.bottom =
-    bottom + "px";
-
-  view.style.margin =
-    "0";
-
-  view.style.overflowY =
-    "auto";
-
-  view.style.overflowX =
-    "hidden";
-
-  view.style.paddingBottom =
-    "24px";
-
 }
 
 
@@ -592,6 +532,11 @@ function addAdminStyles() {
 
 
   style.textContent = `
+
+    #adminView {
+      width:100%;
+      margin:0 0 14px 0;
+    }
 
     .admin-panel {
       margin-top:18px;
@@ -711,9 +656,11 @@ function addAdminStyles() {
     }
 
     @media (max-width:380px) {
+
       .control-grid {
         grid-template-columns:1fr;
       }
+
     }
 
   `;
@@ -791,8 +738,10 @@ function createAdminNav() {
           main.children
         ).forEach(
           child => {
+
             child.style.display =
               "none";
+
           }
         );
 
@@ -801,7 +750,6 @@ function createAdminNav() {
 
       adminView.style.display = "";
 
-      positionAdminView();
 
       if (main) {
         main.scrollTop = 0;
@@ -871,8 +819,10 @@ function createAdminNav() {
               );
 
             if (adminView) {
+
               adminView.style.display =
                 "none";
+
             }
 
 
@@ -931,10 +881,12 @@ function setupAdminControls() {
 
 
   if (login) {
+
     login.addEventListener(
       "click",
       adminLogin
     );
+
   }
 
 
@@ -947,7 +899,9 @@ function setupAdminControls() {
         if (
           event.key === "Enter"
         ) {
+
           adminLogin();
+
         }
 
       }
@@ -957,42 +911,52 @@ function setupAdminControls() {
 
 
   if (logout) {
+
     logout.addEventListener(
       "click",
       adminLogout
     );
+
   }
 
 
   if (refresh) {
+
     refresh.addEventListener(
       "click",
       loadPlayers
     );
+
   }
 
 
   if (refreshCompetition) {
+
     refreshCompetition.addEventListener(
       "click",
       loadCompetitionControl
     );
+
   }
 
 
   if (addPlayer) {
+
     addPlayer.addEventListener(
       "click",
       addNewPlayer
     );
+
   }
 
 
   if (lockRound) {
+
     lockRound.addEventListener(
       "click",
       adminLockCurrentRound
     );
+
   }
 
 }
@@ -1036,7 +1000,9 @@ async function adminLogin() {
 
 
   button.disabled = true;
-  button.textContent = "Checking...";
+
+  button.textContent =
+    "Checking...";
 
 
   try {
@@ -1099,6 +1065,7 @@ async function adminLogin() {
   } finally {
 
     button.disabled = false;
+
     button.textContent = "Login";
 
   }
@@ -1135,22 +1102,28 @@ function showAdminDashboard() {
 
 
   if (loginPanel) {
+
     loginPanel.style.display =
       loggedIn ? "none" : "";
+
   }
 
 
   if (dashboard) {
+
     dashboard.style.display =
       loggedIn ? "" : "none";
+
   }
 
 
   if (title) {
+
     title.textContent =
       loggedIn
         ? "Admin Dashboard"
         : "Admin Login";
+
   }
 
 }
@@ -1184,17 +1157,26 @@ function adminLogout() {
 
 
   if (dashboard) {
-    dashboard.style.display = "none";
+
+    dashboard.style.display =
+      "none";
+
   }
 
 
   if (loginPanel) {
-    loginPanel.style.display = "";
+
+    loginPanel.style.display =
+      "";
+
   }
 
 
   if (adminView) {
-    adminView.style.display = "none";
+
+    adminView.style.display =
+      "none";
+
   }
 
 }
@@ -1234,20 +1216,28 @@ async function loadCompetitionControl() {
 
 
   if (message) {
+
     message.textContent =
       "Loading competition...";
+
   }
 
 
   if (panel) {
-    panel.style.display = "none";
+
+    panel.style.display =
+      "none";
+
   }
 
 
   if (refresh) {
+
     refresh.disabled = true;
+
     refresh.textContent =
       "Loading...";
+
   }
 
 
@@ -1391,7 +1381,9 @@ async function loadCompetitionControl() {
 
 
     if (panel) {
+
       panel.style.display = "";
+
     }
 
 
@@ -1465,8 +1457,10 @@ async function adminLockCurrentRound() {
   if (!token) {
 
     if (message) {
+
       message.textContent =
         "Admin session expired. Please log in again.";
+
     }
 
     return;
@@ -1476,8 +1470,10 @@ async function adminLockCurrentRound() {
   if (!roundId) {
 
     if (message) {
+
       message.textContent =
         "There is no open round available to lock.";
+
     }
 
     return;
@@ -1550,7 +1546,6 @@ async function adminLockCurrentRound() {
 
 
     await loadCompetitionControl();
-
 
     await loadPlayers();
 
@@ -1690,6 +1685,7 @@ async function addNewPlayer() {
 
 
     nameInput.value = "";
+
     codeInput.value = "";
 
 
