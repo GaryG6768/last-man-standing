@@ -1549,3 +1549,761 @@ else {
   startRoundBoard();
 
 }
+
+
+/* =====================================================
+   PUBLIC ELIMINATION HISTORY
+   ===================================================== */
+
+(function(){
+
+  function eliminationEsc(value){
+    return String(value ?? "")
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;")
+      .replace(/'/g,"&#039;");
+  }
+
+
+  function eliminationDate(value){
+
+    if(!value){
+      return "";
+    }
+
+    const d = new Date(value);
+
+    if(Number.isNaN(d.getTime())){
+      return "";
+    }
+
+    return d.toLocaleDateString(
+      "en-GB",
+      {
+        day:"numeric",
+        month:"short",
+        year:"numeric"
+      }
+    );
+  }
+
+
+  function createEliminationsPage(){
+
+    let page =
+      document.getElementById(
+        "publicEliminationsPage"
+      );
+
+    if(page){
+      return page;
+    }
+
+
+    page =
+      document.createElement("div");
+
+    page.id =
+      "publicEliminationsPage";
+
+
+    page.style.display =
+      "none";
+
+    page.style.position =
+      "fixed";
+
+    page.style.left =
+      "0";
+
+    page.style.right =
+      "0";
+
+    page.style.top =
+      "0";
+
+    page.style.bottom =
+      "78px";
+
+    page.style.zIndex =
+      "9998";
+
+    page.style.overflowY =
+      "auto";
+
+    page.style.background =
+      "#0b1220";
+
+    page.style.padding =
+      "18px";
+
+    page.style.boxSizing =
+      "border-box";
+
+
+    page.innerHTML = `
+
+      <div style="
+        max-width:700px;
+        margin:0 auto;
+      ">
+
+        <div style="
+          margin-bottom:18px;
+        ">
+
+          <div style="
+            font-size:12px;
+            letter-spacing:1.5px;
+            opacity:.55;
+            font-weight:800;
+          ">
+            COMPETITION HISTORY
+          </div>
+
+          <div style="
+            font-size:28px;
+            font-weight:900;
+            margin-top:4px;
+          ">
+            Eliminated Players
+          </div>
+
+          <div style="
+            margin-top:7px;
+            opacity:.65;
+            line-height:1.5;
+          ">
+            See who was eliminated in each round
+            and when it happened.
+          </div>
+
+        </div>
+
+
+        <div id="publicEliminationsContent">
+
+          <div class="empty-state">
+            Loading elimination history...
+          </div>
+
+        </div>
+
+      </div>
+
+    `;
+
+
+    document.body.appendChild(page);
+
+    return page;
+
+  }
+
+
+  function hideEliminations(){
+
+    const page =
+      document.getElementById(
+        "publicEliminationsPage"
+      );
+
+    if(page){
+      page.style.display =
+        "none";
+    }
+
+  }
+
+
+  function showEliminations(){
+
+    const page =
+      createEliminationsPage();
+
+
+    page.style.display =
+      "block";
+
+
+    document
+      .querySelectorAll(
+        ".bottom-nav .nav-item"
+      )
+      .forEach(
+        item =>
+          item.classList.remove(
+            "active"
+          )
+      );
+
+
+    const button =
+      document.getElementById(
+        "eliminationsNavButton"
+      );
+
+    if(button){
+      button.classList.add(
+        "active"
+      );
+    }
+
+
+    loadPublicEliminations();
+
+  }
+
+
+  async function loadPublicEliminations(){
+
+    const page =
+      createEliminationsPage();
+
+
+    const content =
+      document.getElementById(
+        "publicEliminationsContent"
+      );
+
+
+    content.innerHTML = `
+
+      <div class="empty-state">
+        Loading elimination history...
+      </div>
+
+    `;
+
+
+    const playerCode =
+      (
+        localStorage.getItem(
+          "lms_player_code"
+        ) || ""
+      )
+        .trim()
+        .toUpperCase();
+
+
+    if(!playerCode){
+
+      content.innerHTML = `
+
+        <div class="empty-state">
+
+          Please return to Home
+          and log in again.
+
+        </div>
+
+      `;
+
+      return;
+
+    }
+
+
+    try{
+
+      const raw =
+        await roundBoardRpc(
+          "get_lms_elimination_history",
+          {
+            p_player_code:
+              playerCode
+          }
+        );
+
+
+      const rows =
+        Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.data)
+            ? raw.data
+            : [];
+
+
+      if(!rows.length){
+
+        content.innerHTML = `
+
+          <div style="
+            padding:25px;
+            text-align:center;
+            opacity:.7;
+          ">
+
+            <div style="
+              font-size:36px;
+              margin-bottom:12px;
+            ">
+              🏆
+            </div>
+
+            No players have been
+            eliminated yet.
+
+          </div>
+
+        `;
+
+        return;
+
+      }
+
+
+      /* -----------------------------------------
+         GROUP BY GAME ROUND
+         ----------------------------------------- */
+
+      const groups = {};
+
+
+      rows.forEach(row => {
+
+        const round =
+          Number(
+            row.game_round_number ??
+            row.round_number ??
+            0
+          );
+
+
+        if(!groups[round]){
+          groups[round] = [];
+        }
+
+
+        groups[round].push(row);
+
+      });
+
+
+      const roundNumbers =
+        Object.keys(groups)
+          .map(Number)
+          .sort(
+            (a,b) => b-a
+          );
+
+
+      let html = "";
+
+
+      roundNumbers.forEach(roundNumber => {
+
+        const players =
+          groups[roundNumber];
+
+
+        html += `
+
+          <section style="
+            margin-bottom:18px;
+            border:1px solid
+              rgba(255,255,255,.08);
+            border-radius:20px;
+            overflow:hidden;
+            background:
+              rgba(255,255,255,.035);
+          ">
+
+            <div style="
+              padding:17px 18px;
+              background:
+                rgba(255,255,255,.045);
+              border-bottom:1px solid
+                rgba(255,255,255,.07);
+            ">
+
+              <div style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                gap:10px;
+              ">
+
+                <div style="
+                  font-size:21px;
+                  font-weight:900;
+                ">
+                  Round ${roundNumber}
+                </div>
+
+                <div style="
+                  font-size:13px;
+                  font-weight:800;
+                  opacity:.65;
+                ">
+                  ${players.length}
+                  eliminated
+                </div>
+
+              </div>
+
+            </div>
+
+
+            <div style="
+              padding:8px 14px;
+            ">
+
+        `;
+
+
+        players.forEach(row => {
+
+          const playerName =
+            row.player_name ||
+            row.name ||
+            "Unknown player";
+
+
+          const team =
+            row.team_name ||
+            row.automatic_team ||
+            row.selected_team ||
+            "";
+
+
+          const fixture =
+            row.fixture ||
+            "";
+
+
+          const reason =
+            row.reason ||
+            row.elimination_reason ||
+            row.eliminated_reason ||
+            "";
+
+
+          const eventDate =
+            eliminationDate(
+              row.event_time ||
+              row.eliminated_at ||
+              row.created_at
+            );
+
+
+          let reasonText =
+            reason;
+
+
+          if(!reasonText){
+
+            const result =
+              String(
+                row.result || ""
+              ).toLowerCase();
+
+
+            if(result === "loss"){
+              reasonText =
+                "Selected team lost";
+            }
+            else if(result === "draw"){
+              reasonText =
+                "Selected team drew";
+            }
+            else{
+              reasonText =
+                "Eliminated";
+            }
+
+          }
+
+
+          html += `
+
+            <div style="
+              padding:15px 4px;
+              border-bottom:1px solid
+                rgba(255,255,255,.06);
+            ">
+
+              <div style="
+                display:flex;
+                justify-content:space-between;
+                gap:12px;
+                align-items:flex-start;
+              ">
+
+                <div style="
+                  font-size:17px;
+                  font-weight:900;
+                ">
+                  ${eliminationEsc(
+                    playerName
+                  )}
+                </div>
+
+                <div style="
+                  color:#fca5a5;
+                  font-size:11px;
+                  font-weight:900;
+                  white-space:nowrap;
+                ">
+                  ELIMINATED
+                </div>
+
+              </div>
+
+
+              ${
+                team
+                  ? `
+                    <div style="
+                      margin-top:7px;
+                      font-weight:700;
+                    ">
+                      Team:
+                      ${eliminationEsc(team)}
+                    </div>
+                  `
+                  : ""
+              }
+
+
+              ${
+                fixture
+                  ? `
+                    <div style="
+                      margin-top:5px;
+                      font-size:13px;
+                      opacity:.65;
+                    ">
+                      ${eliminationEsc(
+                        fixture
+                      )}
+                    </div>
+                  `
+                  : ""
+              }
+
+
+              ${
+                reasonText
+                  ? `
+                    <div style="
+                      margin-top:7px;
+                      font-size:13px;
+                      opacity:.75;
+                    ">
+                      ${eliminationEsc(
+                        reasonText
+                      )}
+                    </div>
+                  `
+                  : ""
+              }
+
+
+              ${
+                eventDate
+                  ? `
+                    <div style="
+                      margin-top:7px;
+                      font-size:12px;
+                      opacity:.5;
+                    ">
+                      Eliminated:
+                      ${eliminationEsc(
+                        eventDate
+                      )}
+                    </div>
+                  `
+                  : ""
+              }
+
+            </div>
+
+          `;
+
+        });
+
+
+        html += `
+
+            </div>
+
+          </section>
+
+        `;
+
+      });
+
+
+      content.innerHTML =
+        html;
+
+
+    }catch(error){
+
+      console.error(
+        "Elimination history error",
+        error
+      );
+
+
+      content.innerHTML = `
+
+        <div class="empty-state">
+
+          Could not load the
+          elimination history.
+
+          <br><br>
+
+          ${eliminationEsc(
+            error?.message ||
+            "Please try again."
+          )}
+
+        </div>
+
+      `;
+
+    }
+
+  }
+
+
+  function createEliminationsButton(){
+
+    const nav =
+      document.querySelector(
+        ".bottom-nav"
+      );
+
+
+    if(!nav){
+      return;
+    }
+
+
+    if(
+      document.getElementById(
+        "eliminationsNavButton"
+      )
+    ){
+      return;
+    }
+
+
+    const button =
+      document.createElement(
+        "button"
+      );
+
+
+    button.id =
+      "eliminationsNavButton";
+
+    button.className =
+      "nav-item";
+
+
+    button.innerHTML = `
+
+      <span>
+        ☠
+      </span>
+
+      <small>
+        Eliminated
+      </small>
+
+    `;
+
+
+    nav.appendChild(button);
+
+
+    button.addEventListener(
+      "click",
+      function(event){
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        showEliminations();
+
+      },
+      true
+    );
+
+  }
+
+
+  function setupEliminationNavigation(){
+
+    createEliminationsPage();
+
+    createEliminationsButton();
+
+
+    /*
+     * Hide the elimination page whenever
+     * another navigation button is pressed.
+     */
+
+    document.addEventListener(
+      "click",
+      function(event){
+
+        const button =
+          event.target.closest(
+            ".bottom-nav .nav-item"
+          );
+
+
+        if(!button){
+          return;
+        }
+
+
+        if(
+          button.id ===
+          "eliminationsNavButton"
+        ){
+          return;
+        }
+
+
+        hideEliminations();
+
+      },
+      false
+    );
+
+  }
+
+
+  function startPublicEliminations(){
+
+    setupEliminationNavigation();
+
+  }
+
+
+  if(
+    document.readyState ===
+    "loading"
+  ){
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      startPublicEliminations
+    );
+
+  }else{
+
+    startPublicEliminations();
+
+  }
+
+})();
