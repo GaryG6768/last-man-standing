@@ -1,5 +1,5 @@
 /* =====================================================
-   LAST MAN STANDING — ROUND BOARD
+   LAST MAN STANDING — ROUND BOARD PAGE
    ===================================================== */
 
 const ROUND_BOARD_URL =
@@ -45,29 +45,38 @@ async function roundBoardRpc(name, body) {
 
   }
 
-  const response = await fetch(
-    `${ROUND_BOARD_URL}/rest/v1/rpc/${name}`,
-    {
-      method: "POST",
+  const response =
+    await fetch(
+      `${ROUND_BOARD_URL}/rest/v1/rpc/${name}`,
+      {
+        method: "POST",
 
-      headers: {
-        apikey: ROUND_BOARD_KEY,
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
+        headers: {
+          apikey: ROUND_BOARD_KEY,
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
 
-      body: JSON.stringify(body)
-    }
-  );
+        body: JSON.stringify(body)
+      }
+    );
 
-  const text = await response.text();
+  const text =
+    await response.text();
 
   let data;
 
   try {
-    data = text ? JSON.parse(text) : null;
+
+    data =
+      text
+        ? JSON.parse(text)
+        : null;
+
   } catch {
+
     data = text;
+
   }
 
   if (!response.ok) {
@@ -101,103 +110,251 @@ function roundBoardEsc(value) {
 
 
 /* =====================================================
-   CREATE BOARD
+   CREATE PAGE
    ===================================================== */
 
-function createRoundBoard() {
+function createRoundBoardPage() {
 
-  if (document.getElementById("roundBoard")) {
-    return true;
+  if (
+    document.getElementById(
+      "roundBoard"
+    )
+  ) {
+    return;
   }
 
   const main =
     document.querySelector("main");
 
-  const selection =
-    document.querySelector(".selection-card");
-
-  if (!main || !selection) {
-    return false;
+  if (!main) {
+    return;
   }
 
-  const board =
+  const page =
     document.createElement("section");
 
-  board.id = "roundBoard";
+  page.id =
+    "roundBoard";
 
-  board.className =
-    "round-board-card";
+  page.className =
+    "round-board-page";
 
-  board.style.display = "none";
+  page.style.display =
+    "none";
 
-  board.innerHTML = `
+  page.innerHTML = `
 
-    <div class="round-board-header">
+    <div class="round-board-card">
 
-      <div>
+      <div class="section-title">
 
-        <span class="muted">
-          ROUND SELECTIONS
-        </span>
+        <div>
 
-        <h2 id="roundBoardTitle">
-          Current Round
-        </h2>
+          <span class="muted">
+            ROUND BOARD
+          </span>
+
+          <h2 id="roundBoardTitle">
+            Round
+          </h2>
+
+        </div>
 
       </div>
 
+
+      <div
+        id="roundBoardMessage"
+        class="round-board-message"
+      >
+        Loading round...
+      </div>
+
+
+      <div
+        id="roundBoardContent"
+      ></div>
+
+
+      <div
+        id="eliminatedBoard"
+      ></div>
+
     </div>
-
-    <div
-      id="roundBoardMessage"
-      class="round-board-message"
-    >
-      Waiting for selections...
-    </div>
-
-    <div id="roundBoardContent"></div>
-
-    <div id="eliminatedBoard"></div>
 
   `;
 
-  const rules =
-    Array.from(main.children).find(
-      child =>
-        child.classList.contains("rules-card")
-    );
-
-  if (rules) {
-
-    main.insertBefore(
-      board,
-      rules
-    );
-
-  } else {
-
-    main.appendChild(board);
-
-  }
+  main.appendChild(page);
 
   addRoundBoardStyles();
-
-  return true;
 }
 
 
 /* =====================================================
-   KEEP TRYING UNTIL HOME CONTENT EXISTS
+   CREATE ROUND BOARD NAV BUTTON
    ===================================================== */
 
-function ensureRoundBoard() {
+function createRoundBoardNav() {
 
-  if (document.getElementById("roundBoard")) {
-    return true;
+  const nav =
+    document.querySelector(
+      ".bottom-nav"
+    );
+
+  if (!nav) {
+    return;
   }
 
-  return createRoundBoard();
+  if (
+    document.getElementById(
+      "roundBoardNavButton"
+    )
+  ) {
+    return;
+  }
 
+  const button =
+    document.createElement("button");
+
+  button.id =
+    "roundBoardNavButton";
+
+  button.className =
+    "nav-item";
+
+  button.innerHTML = `
+
+    <span>
+      📋
+    </span>
+
+    <small>
+      Round Board
+    </small>
+
+  `;
+
+  button.addEventListener(
+    "click",
+    showRoundBoardPage
+  );
+
+  nav.insertBefore(
+    button,
+    document.getElementById(
+      "adminNavButton"
+    ) || null
+  );
+}
+
+
+/* =====================================================
+   SHOW ROUND BOARD
+   ===================================================== */
+
+function showRoundBoardPage() {
+
+  const main =
+    document.querySelector("main");
+
+  const page =
+    document.getElementById(
+      "roundBoard"
+    );
+
+  if (!main || !page) {
+    return;
+  }
+
+  Array.from(
+    main.children
+  ).forEach(
+    child => {
+
+      child.style.display =
+        "none";
+
+    }
+  );
+
+  page.style.display =
+    "";
+
+  main.scrollTop = 0;
+
+  document
+    .querySelectorAll(
+      ".bottom-nav .nav-item"
+    )
+    .forEach(
+      item => {
+
+        item.classList.remove(
+          "active"
+        );
+
+      }
+    );
+
+  const button =
+    document.getElementById(
+      "roundBoardNavButton"
+    );
+
+  if (button) {
+
+    button.classList.add(
+      "active"
+    );
+
+  }
+
+  loadRoundBoard();
+}
+
+
+/* =====================================================
+   HIDE ROUND BOARD WHEN ANOTHER PAGE IS SELECTED
+   ===================================================== */
+
+function setupOtherNavigation() {
+
+  const buttons =
+    document.querySelectorAll(
+      ".bottom-nav .nav-item"
+    );
+
+  buttons.forEach(
+    button => {
+
+      if (
+        button.id ===
+        "roundBoardNavButton"
+      ) {
+        return;
+      }
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          const page =
+            document.getElementById(
+              "roundBoard"
+            );
+
+          if (page) {
+
+            page.style.display =
+              "none";
+
+          }
+
+        }
+      );
+
+    }
+  );
 }
 
 
@@ -223,36 +380,41 @@ function addRoundBoardStyles() {
 
   style.textContent = `
 
+    .round-board-page {
+      width:100%;
+      box-sizing:border-box;
+    }
+
     .round-board-card {
       border:1px solid rgba(255,255,255,.08);
       background:rgba(18,28,44,.9);
       border-radius:20px;
-      margin-bottom:14px;
       padding:18px;
+      margin-bottom:20px;
       box-shadow:0 12px 35px rgba(0,0,0,.18);
     }
 
-    .round-board-header {
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-    }
-
     .round-board-message {
-      margin-top:12px;
-      padding:13px 14px;
+      margin-top:14px;
+      padding:14px;
       border-radius:14px;
       background:rgba(255,255,255,.035);
       color:#9aa7ba;
+      font-size:13px;
+      line-height:1.55;
+    }
+
+    .round-board-count {
+      margin-top:16px;
+      margin-bottom:10px;
+      color:#8e9aad;
       font-size:12px;
-      line-height:1.5;
+      font-weight:700;
     }
 
     .round-board-list {
-      margin-top:14px;
       display:grid;
-      gap:8px;
+      gap:9px;
     }
 
     .round-board-player {
@@ -260,40 +422,40 @@ function addRoundBoardStyles() {
       justify-content:space-between;
       align-items:center;
       gap:12px;
-      padding:12px 13px;
-      border-radius:14px;
+      padding:13px;
+      border-radius:15px;
       background:#0c1422;
       border:1px solid rgba(255,255,255,.06);
     }
 
     .round-board-player-name {
-      font-weight:750;
       font-size:14px;
+      font-weight:800;
+    }
+
+    .round-board-status {
+      margin-top:4px;
+      font-size:10px;
+      font-weight:900;
+      text-transform:uppercase;
     }
 
     .round-board-team {
       text-align:right;
-      font-weight:800;
       font-size:14px;
+      font-weight:900;
     }
 
     .round-board-fixture {
       margin-top:3px;
+      text-align:right;
       color:#7f8ca0;
       font-size:10px;
-      text-align:right;
-    }
-
-    .round-board-status {
-      margin-top:3px;
-      font-size:10px;
-      font-weight:800;
-      text-transform:uppercase;
     }
 
     .round-board-section-title {
-      margin-top:20px;
-      margin-bottom:9px;
+      margin-top:22px;
+      margin-bottom:10px;
       font-size:11px;
       font-weight:900;
       letter-spacing:.12em;
@@ -307,51 +469,60 @@ function addRoundBoardStyles() {
     }
 
     .round-board-eliminated-player {
-      padding:8px 10px;
+      padding:8px 11px;
       border-radius:999px;
       background:rgba(239,68,68,.09);
       border:1px solid rgba(239,68,68,.18);
       color:#fca5a5;
       font-size:11px;
-      font-weight:750;
-    }
-
-    .round-board-count {
-      margin-top:10px;
-      font-size:12px;
-      color:#8e9aad;
+      font-weight:800;
     }
 
     .round-board-auto {
       color:#fcd34d;
     }
 
+    .round-board-eliminated-status {
+      color:#fca5a5;
+    }
+
     .round-board-alive {
       color:#86efac;
     }
 
-    .round-board-eliminated-status {
-      color:#fca5a5;
+    @media (max-width:600px) {
+
+      .round-board-player {
+        align-items:flex-start;
+      }
+
+      .round-board-team {
+        max-width:150px;
+      }
+
     }
 
   `;
 
   document.head.appendChild(style);
-
 }
 
 
 /* =====================================================
-   LOAD CURRENT ROUND
+   LOAD ROUND BOARD DATA
    ===================================================== */
 
 async function loadRoundBoard() {
 
-  if (roundBoardState.loading) {
+  if (
+    roundBoardState.loading
+  ) {
     return;
   }
 
-  if (!window.lmsAuthReady) {
+  if (
+    !window.lmsAuthReady
+  ) {
     return;
   }
 
@@ -362,11 +533,8 @@ async function loadRoundBoard() {
     return;
   }
 
-  if (!ensureRoundBoard()) {
-    return;
-  }
-
-  roundBoardState.loading = true;
+  roundBoardState.loading =
+    true;
 
   try {
 
@@ -383,6 +551,7 @@ async function loadRoundBoard() {
       return;
     }
 
+
     const playerData =
       await roundBoardRpc(
         "get_lms_player_data",
@@ -392,17 +561,22 @@ async function loadRoundBoard() {
         }
       );
 
-    if (!playerData?.success) {
+    if (
+      !playerData?.success
+    ) {
       return;
     }
+
 
     const round =
       playerData.current_round;
 
-    if (!round?.id) {
-      hideRoundBoard();
+    if (
+      !round?.id
+    ) {
       return;
     }
+
 
     const boardData =
       await roundBoardRpc(
@@ -413,9 +587,12 @@ async function loadRoundBoard() {
         }
       );
 
-    if (!boardData?.success) {
+    if (
+      !boardData?.success
+    ) {
       return;
     }
+
 
     roundBoardState.roundId =
       round.id;
@@ -432,44 +609,34 @@ async function loadRoundBoard() {
       error
     );
 
+    const message =
+      document.getElementById(
+        "roundBoardMessage"
+      );
+
+    if (message) {
+
+      message.textContent =
+        "The round board could not be loaded.";
+
+    }
+
   } finally {
 
-    roundBoardState.loading = false;
+    roundBoardState.loading =
+      false;
 
   }
-
 }
 
 
 /* =====================================================
-   HIDE BOARD
-   ===================================================== */
-
-function hideRoundBoard() {
-
-  const board =
-    document.getElementById(
-      "roundBoard"
-    );
-
-  if (board) {
-    board.style.display = "none";
-  }
-
-}
-
-
-/* =====================================================
-   RENDER BOARD
+   RENDER
    ===================================================== */
 
 function renderRoundBoard() {
 
-  if (!ensureRoundBoard()) {
-    return;
-  }
-
-  const board =
+  const page =
     document.getElementById(
       "roundBoard"
     );
@@ -477,11 +644,9 @@ function renderRoundBoard() {
   const data =
     roundBoardState.data;
 
-  if (!board || !data) {
+  if (!page || !data) {
     return;
   }
-
-  board.style.display = "";
 
   const round =
     data.round || {};
@@ -509,6 +674,7 @@ function renderRoundBoard() {
       "eliminatedBoard"
     );
 
+
   if (title) {
 
     title.textContent =
@@ -522,7 +688,7 @@ function renderRoundBoard() {
 
 
   /* ===================================================
-     SELECTIONS HIDDEN
+     HIDDEN
      =================================================== */
 
   if (!data.revealed) {
@@ -535,7 +701,7 @@ function renderRoundBoard() {
           Selections are still hidden
         </strong>
 
-        <br>
+        <br><br>
 
         ${Number(
           counts.selected || 0
@@ -546,7 +712,7 @@ function renderRoundBoard() {
         )}
         players have selected.
 
-        <br>
+        <br><br>
 
         Everyone's selections will appear
         when all predictions are in or the
@@ -564,41 +730,42 @@ function renderRoundBoard() {
 
 
   /* ===================================================
-     SELECTIONS REVEALED
+     REVEALED
      =================================================== */
 
   else {
 
+    let reason =
+      "The selections are now visible.";
+
+    if (
+      data.reveal_reason ===
+      "all_predictions_in"
+    ) {
+
+      reason =
+        "Everyone has made their selection.";
+
+    } else if (
+      data.reveal_reason ===
+      "deadline_passed"
+    ) {
+
+      reason =
+        "The selection deadline has passed.";
+
+    } else if (
+      data.reveal_reason ===
+      "round_locked"
+    ) {
+
+      reason =
+        "The round has been locked.";
+
+    }
+
+
     if (message) {
-
-      let reason =
-        "The selections are now visible.";
-
-      if (
-        data.reveal_reason ===
-        "all_predictions_in"
-      ) {
-
-        reason =
-          "Everyone has made their selection.";
-
-      } else if (
-        data.reveal_reason ===
-        "deadline_passed"
-      ) {
-
-        reason =
-          "The selection deadline has passed.";
-
-      } else if (
-        data.reveal_reason ===
-        "round_locked"
-      ) {
-
-        reason =
-          "The round has been locked.";
-
-      }
 
       message.innerHTML = `
 
@@ -606,7 +773,7 @@ function renderRoundBoard() {
           Selections revealed
         </strong>
 
-        <br>
+        <br><br>
 
         ${roundBoardEsc(reason)}
 
@@ -651,10 +818,11 @@ function renderRoundBoard() {
 
               const status =
                 String(
-                  selection.player_status || ""
+                  selection.player_status ||
+                  ""
                 ).toLowerCase();
 
-              const selectionType =
+              const type =
                 String(
                   selection.selection_type ||
                   "normal"
@@ -662,13 +830,20 @@ function renderRoundBoard() {
 
               let statusText = "";
 
+              let statusClass =
+                "round-board-alive";
+
+
               if (
-                selectionType ===
+                type ===
                 "automatic"
               ) {
 
                 statusText =
                   "AUTOMATIC";
+
+                statusClass =
+                  "round-board-auto";
 
               } else if (
                 status ===
@@ -678,16 +853,11 @@ function renderRoundBoard() {
                 statusText =
                   "ELIMINATED";
 
+                statusClass =
+                  "round-board-eliminated-status";
+
               }
 
-              const statusClass =
-                selectionType ===
-                  "automatic"
-                  ? "round-board-auto"
-                  : status ===
-                      "eliminated"
-                    ? "round-board-eliminated-status"
-                    : "round-board-alive";
 
               return `
 
@@ -718,6 +888,7 @@ function renderRoundBoard() {
                     }
 
                   </div>
+
 
                   <div>
 
@@ -768,11 +939,15 @@ function renderRoundBoard() {
       ? data.eliminated
       : [];
 
+
   if (!eliminated) {
     return;
   }
 
-  if (!eliminatedPlayers.length) {
+
+  if (
+    !eliminatedPlayers.length
+  ) {
 
     eliminated.innerHTML = `
 
@@ -783,7 +958,9 @@ function renderRoundBoard() {
       </div>
 
       <div class="round-board-message">
+
         No players have been eliminated.
+
       </div>
 
     `;
@@ -829,110 +1006,35 @@ function renderRoundBoard() {
 
 
 /* =====================================================
-   NAVIGATION
-   ===================================================== */
-
-function setupRoundBoardNavigation() {
-
-  const buttons =
-    document.querySelectorAll(
-      ".bottom-nav .nav-item"
-    );
-
-  buttons.forEach(button => {
-
-    button.addEventListener(
-      "click",
-      () => {
-
-        setTimeout(() => {
-
-          const board =
-            document.getElementById(
-              "roundBoard"
-            );
-
-          if (!board) {
-            return;
-          }
-
-          const label =
-            button
-              .querySelector("small")
-              ?.textContent
-              ?.trim()
-              ?.toLowerCase();
-
-          if (label === "home") {
-
-            board.style.display = "";
-
-          } else {
-
-            board.style.display = "none";
-
-          }
-
-        }, 50);
-
-      }
-    );
-
-  });
-
-}
-
-
-/* =====================================================
    START
    ===================================================== */
 
-async function startRoundBoard() {
+function startRoundBoard() {
 
-  setupRoundBoardNavigation();
+  createRoundBoardPage();
+
+  createRoundBoardNav();
+
+  setupOtherNavigation();
 
   /*
-   * The main app may still be loading when this
-   * script starts. Try several times so the board
-   * is created as soon as the Home content exists.
+   * Give the existing app a moment to finish
+   * its normal startup before loading the board.
    */
 
-  let attempts = 0;
-
-  const tryCreate = () => {
-
-    attempts++;
-
-    if (ensureRoundBoard()) {
-      loadRoundBoard();
-      return;
-    }
-
-    if (attempts < 30) {
-
-      setTimeout(
-        tryCreate,
-        500
-      );
-
-    }
-
-  };
-
-  tryCreate();
-
-
-  setInterval(
-    () => {
-
-      ensureRoundBoard();
-
-      loadRoundBoard();
-
-    },
-    30000
+  setTimeout(
+    loadRoundBoard,
+    1000
   );
 
+  /*
+   * Refresh the board every 30 seconds.
+   */
+
+  setInterval(
+    loadRoundBoard,
+    30000
+  );
 }
 
 
