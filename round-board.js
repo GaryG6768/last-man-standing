@@ -1060,8 +1060,7 @@ function renderRoundBoard() {
         <br><br>
 
         Everyone's selections will
-        appear when all predictions
-        are in or the deadline passes.
+appear after the deadline.
 
       `;
 
