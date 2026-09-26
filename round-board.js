@@ -1036,7 +1036,17 @@ function renderRoundBoard() {
    * HIDDEN
    */
 
-  if (!data.revealed) {
+  if (
+  !data.revealed ||
+  !(
+    new Date(
+      data.round?.selection_deadline ||
+      data.selection_deadline ||
+      data.deadline ||
+      ""
+    ).getTime() <= Date.now()
+  )
+) {
 
     if (message) {
 
