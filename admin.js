@@ -2408,24 +2408,9 @@ async function saveAdminPrediction(
 
   }
 
-  } catch (error) {
-
-    if (message) {
-      message.textContent =
-        error?.message ||
-        "Prediction could not be saved.";
-    }
-
-    if (button) {
-      button.disabled = false;
-      button.textContent =
-        "ENTER " +
-        teamName;
-    }
-
   }
 
-}
+
 /* =====================================================
    RENDER PLAYERS
    ===================================================== */
