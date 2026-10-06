@@ -2014,15 +2014,23 @@ async function loadAdminPredictionPlayer() {
 
   try {
 
-    const raw =
-      await adminCallRpc(
-        "get_lms_player_data",
-        {
-          p_player_code:
-            player.player_code
-        }
+    
+    const token =
+      sessionStorage.getItem(
+        "lms_admin_token"
       );
 
+    const raw =
+      await adminCallRpc(
+        "admin_get_player_prediction_data",
+        {
+          p_session_token:
+            token,
+
+          p_player_id:
+            player.id
+        }
+      );
     const data =
       Array.isArray(raw)
         ? raw[0]
