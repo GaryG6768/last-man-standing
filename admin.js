@@ -2351,7 +2351,7 @@ async function saveAdminPrediction(
       "...";
   }
 
-  try {
+    try {
 
     const result =
       await adminCallRpc(
@@ -2368,23 +2368,45 @@ async function saveAdminPrediction(
         }
       );
 
-    if (
-      result === null ||
-      result === undefined
-    ) {
-      throw new Error(
-        "Prediction could not be saved."
-      );
-    }
+    console.log(
+      "ADMIN MAKE SELECTION RESULT:",
+      result
+    );
 
     if (message) {
       message.textContent =
         teamName +
-        " entered successfully.";
+        " entered successfully. Refreshing...";
     }
 
     await loadAdminPredictionPlayer();
+
     await loadPlayers();
+
+  } catch (error) {
+
+    console.error(
+      "ADMIN MAKE SELECTION ERROR:",
+      error
+    );
+
+    if (message) {
+      message.textContent =
+        "ERROR: " +
+        (
+          error?.message ||
+          "Prediction could not be saved."
+        );
+    }
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "ENTER " +
+        teamName;
+    }
+
+  }
 
   } catch (error) {
 
