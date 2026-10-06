@@ -453,6 +453,54 @@ function createAdminView() {
       </div>
 
 
+            <!-- ADMIN ENTER PREDICTION -->
+
+      <div class="admin-panel">
+
+        <div class="muted">
+          PLAYER PREDICTION
+        </div>
+
+        <h2>
+          Enter Prediction For Player
+        </h2>
+
+        <p class="hint">
+          Enter a selection on a player's behalf.
+        </p>
+
+        <select
+          id="adminPredictionPlayer"
+          class="admin-input"
+        >
+          <option value="">
+            Select player
+          </option>
+        </select>
+
+        <div
+          id="adminPredictionCurrent"
+          class="hint"
+          style="margin-top:10px;"
+        >
+          Select a player to see the current round.
+        </div>
+
+        <div
+          id="adminPredictionFixtures"
+          style="margin-top:12px;"
+        ></div>
+
+        <p
+          id="adminPredictionMessage"
+          class="hint"
+        >
+          No prediction has been entered yet.
+        </p>
+
+      </div>
+
+
       <!-- LOGOUT -->
 
       <button
@@ -958,7 +1006,19 @@ function setupAdminControls() {
     );
 
   }
+  const predictionPlayer =
+    document.getElementById(
+      "adminPredictionPlayer"
+    );
 
+  if (predictionPlayer) {
+
+    predictionPlayer.addEventListener(
+      "change",
+      loadAdminPredictionPlayer
+    );
+
+  }
 }
 
 
@@ -1800,7 +1860,12 @@ async function loadPlayers() {
 
     const players =
       result.players || [];
+    window.lmsAdminPlayers =
+      players;
 
+    populateAdminPredictionPlayers(
+      players
+    );
 
     count.textContent =
       players.length;
@@ -1840,7 +1905,497 @@ async function loadPlayers() {
 
 }
 
+/* =====================================================
+   ADMIN ENTER PREDICTION
+   ===================================================== */
 
+function populateAdminPredictionPlayers(players) {
+
+  const select =
+    document.getElementById(
+      "adminPredictionPlayer"
+    );
+
+  if (!select) return;
+
+  const current =
+    select.value;
+
+  select.innerHTML =
+    '<option value="">Select player</option>' +
+    (players || [])
+      .filter(function(player) {
+        return !["eliminated", "removed"].includes(
+          String(player.status || "").toLowerCase()
+        );
+      })
+      .map(function(player) {
+        return '<option value="' +
+          escapeAdminHtml(player.id) +
+          '">' +
+          escapeAdminHtml(player.name) +
+          ' (' +
+          escapeAdminHtml(player.player_code) +
+          ')</option>';
+      })
+      .join("");
+
+  if (current) {
+    select.value = current;
+  }
+
+}
+
+
+async function loadAdminPredictionPlayer() {
+
+  const select =
+    document.getElementById(
+      "adminPredictionPlayer"
+    );
+
+  const current =
+    document.getElementById(
+      "adminPredictionCurrent"
+    );
+
+  const fixtures =
+    document.getElementById(
+      "adminPredictionFixtures"
+    );
+
+  const message =
+    document.getElementById(
+      "adminPredictionMessage"
+    );
+
+  const playerId =
+    select?.value || "";
+
+  if (!playerId) {
+
+    if (current) {
+      current.textContent =
+        "Select a player to see the current round.";
+    }
+
+    if (fixtures) {
+      fixtures.innerHTML = "";
+    }
+
+    if (message) {
+      message.textContent =
+        "No prediction has been entered yet.";
+    }
+
+    return;
+  }
+
+  const player =
+    (window.lmsAdminPlayers || [])
+      .find(function(item) {
+        return String(item.id) === String(playerId);
+      });
+
+  if (!player) return;
+
+  if (current) {
+    current.textContent =
+      "Loading current round...";
+  }
+
+  if (fixtures) {
+    fixtures.innerHTML = "";
+  }
+
+  if (message) {
+    message.textContent = "Loading...";
+  }
+
+  try {
+
+    const raw =
+      await adminCallRpc(
+        "get_lms_player_data",
+        {
+          p_player_code:
+            player.player_code
+        }
+      );
+
+    const data =
+      Array.isArray(raw)
+        ? raw[0]
+        : raw;
+
+    if (!data || data.success === false) {
+      throw new Error(
+        data?.message ||
+        "Player data could not be loaded."
+      );
+    }
+
+    const round =
+      data.current_round ||
+      data.round ||
+      {};
+
+    const selection =
+      data.selection ||
+      null;
+
+    if (current) {
+      current.innerHTML =
+        "<strong>Round " +
+        escapeAdminHtml(
+          round.game_round_number ||
+          round.round_number ||
+          "?"
+        ) +
+        "</strong> — Current selection: <strong>" +
+        escapeAdminHtml(
+          selection?.team_name ||
+          "No selection"
+        ) +
+        "</strong>";
+    }
+
+    if (!round.id) {
+      throw new Error(
+        "There is no current round."
+      );
+    }
+
+    if (
+      String(round.status || "").toLowerCase() !==
+      "open"
+    ) {
+      throw new Error(
+        "The current round is not open for selections."
+      );
+    }
+
+    renderAdminPredictionFixtures(
+      player,
+      round,
+      data.fixtures || [],
+      data.used_teams || [],
+      selection
+    );
+
+    if (message) {
+      message.textContent =
+        "Choose the team you want to enter for this player.";
+    }
+
+  } catch (error) {
+
+    if (fixtures) {
+      fixtures.innerHTML = "";
+    }
+
+    if (message) {
+      message.textContent =
+        error?.message ||
+        "Prediction could not be loaded.";
+    }
+
+  }
+
+}
+
+
+function renderAdminPredictionFixtures(
+  player,
+  round,
+  fixtureList,
+  usedTeams,
+  currentSelection
+) {
+
+  const container =
+    document.getElementById(
+      "adminPredictionFixtures"
+    );
+
+  if (!container) return;
+
+  const usedIds = new Set();
+  const usedNames = new Set();
+
+  (Array.isArray(usedTeams) ? usedTeams : [])
+    .forEach(function(item) {
+
+      const id =
+        item?.team_id ||
+        item?.id ||
+        "";
+
+      const name =
+        item?.team_name ||
+        item?.name ||
+        (typeof item === "string" ? item : "");
+
+      if (id) {
+        usedIds.add(String(id));
+      }
+
+      if (name) {
+        usedNames.add(
+          String(name)
+            .trim()
+            .toLowerCase()
+        );
+      }
+
+    });
+
+  const currentId =
+    currentSelection?.team_id ||
+    "";
+
+  const fixtures =
+    Array.isArray(fixtureList)
+      ? fixtureList
+      : [];
+
+  if (!fixtures.length) {
+
+    container.innerHTML =
+      '<div class="hint">No fixtures are available.</div>';
+
+    return;
+  }
+
+  container.innerHTML =
+    fixtures
+      .map(function(fixture) {
+
+        const homeId =
+          fixture.home_team_id ||
+          fixture.home_id ||
+          "";
+
+        const awayId =
+          fixture.away_team_id ||
+          fixture.away_id ||
+          "";
+
+        const homeName =
+          fixture.home_name ||
+          fixture.home_team ||
+          fixture.home ||
+          "Home";
+
+        const awayName =
+          fixture.away_name ||
+          fixture.away_team ||
+          fixture.away ||
+          "Away";
+
+        const kickoff =
+          formatAdminDateTime(
+            fixture.kickoff_time
+          );
+
+        function teamButton(
+          teamId,
+          teamName
+        ) {
+
+          const isCurrent =
+            currentId &&
+            String(currentId) ===
+            String(teamId);
+
+          const alreadyUsed =
+            !isCurrent &&
+            (
+              usedIds.has(
+                String(teamId)
+              ) ||
+              usedNames.has(
+                String(teamName)
+                  .trim()
+                  .toLowerCase()
+              )
+            );
+
+          return (
+            '<button type="button" ' +
+            'class="primary-btn admin-prediction-team" ' +
+            'data-player-id="' +
+            escapeAdminHtml(player.id) +
+            '" ' +
+            'data-round-id="' +
+            escapeAdminHtml(round.id) +
+            '" ' +
+            'data-team-id="' +
+            escapeAdminHtml(teamId) +
+            '" ' +
+            'data-team-name="' +
+            escapeAdminHtml(teamName) +
+            '"' +
+            (alreadyUsed ? " disabled" : "") +
+            ' style="margin-top:8px;">' +
+            (
+              isCurrent
+                ? "CURRENT "
+                : alreadyUsed
+                  ? "USED "
+                  : "ENTER "
+            ) +
+            escapeAdminHtml(teamName) +
+            "</button>"
+          );
+
+        }
+
+        return (
+          '<div class="admin-player" style="margin-top:10px;">' +
+
+            '<div style="font-weight:800;">' +
+              escapeAdminHtml(homeName) +
+              " v " +
+              escapeAdminHtml(awayName) +
+            "</div>" +
+
+            '<div class="hint" style="margin-top:4px;">' +
+              escapeAdminHtml(kickoff) +
+            "</div>" +
+
+            teamButton(
+              homeId,
+              homeName
+            ) +
+
+            teamButton(
+              awayId,
+              awayName
+            ) +
+
+          "</div>"
+        );
+
+      })
+      .join("");
+
+  container
+    .querySelectorAll(
+      ".admin-prediction-team"
+    )
+    .forEach(function(button) {
+
+      button.addEventListener(
+        "click",
+        function() {
+
+          const teamName =
+            button.dataset.teamName;
+
+          if (!window.confirm(
+            "Enter " +
+            teamName +
+            " for this player?"
+          )) {
+            return;
+          }
+
+          saveAdminPrediction(
+            button.dataset.playerId,
+            button.dataset.roundId,
+            button.dataset.teamId,
+            teamName,
+            button
+          );
+
+        }
+      );
+
+    });
+
+}
+
+
+async function saveAdminPrediction(
+  playerId,
+  roundId,
+  teamId,
+  teamName,
+  button
+) {
+
+  const message =
+    document.getElementById(
+      "adminPredictionMessage"
+    );
+
+  if (button) {
+    button.disabled = true;
+    button.textContent =
+      "SAVING...";
+  }
+
+  if (message) {
+    message.textContent =
+      "Entering " +
+      teamName +
+      "...";
+  }
+
+  try {
+
+    const result =
+      await adminCallRpc(
+        "admin_make_selection",
+        {
+          p_player_id:
+            playerId,
+
+          p_round_id:
+            roundId,
+
+          p_team_id:
+            teamId
+        }
+      );
+
+    if (
+      result === null ||
+      result === undefined
+    ) {
+      throw new Error(
+        "Prediction could not be saved."
+      );
+    }
+
+    if (message) {
+      message.textContent =
+        teamName +
+        " entered successfully.";
+    }
+
+    await loadAdminPredictionPlayer();
+    await loadPlayers();
+
+  } catch (error) {
+
+    if (message) {
+      message.textContent =
+        error?.message ||
+        "Prediction could not be saved.";
+    }
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "ENTER " +
+        teamName;
+    }
+
+  }
+
+}
 /* =====================================================
    RENDER PLAYERS
    ===================================================== */
