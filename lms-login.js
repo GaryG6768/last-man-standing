@@ -981,7 +981,21 @@
           LOG OUT
         </button>
 
-
+        <button
+          id="lms-switch-player"
+          style="
+            width:100%;
+            margin-top:12px;
+            padding:14px;
+            border:0;
+            border-radius:10px;
+            background:#2563eb;
+            color:white;
+            font-weight:800;
+          "
+        >
+          SWITCH PLAYER
+        </button>
         <button
           id="lms-security-close"
           style="
@@ -1033,7 +1047,31 @@
         await window.lmsLogoutPlayer();
       };
 
+    document
+      .getElementById(
+        "lms-switch-player"
+      )
+      .onclick =
+      async function () {
 
+        overlay.remove();
+
+        clearCode();
+
+        if (supabaseClient) {
+
+          await supabaseClient.auth
+            .signOut({
+              scope: "local"
+            });
+        }
+
+        showLogin();
+
+        setLoginMessage(
+          "Enter the next player's code, then use Face ID / fingerprint to sign them in."
+        );
+      };
     document
       .getElementById(
         "lms-verify-security"
