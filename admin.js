@@ -500,7 +500,53 @@ function createAdminView() {
 
       </div>
 
+      <!-- ADD THIS PHONE -->
 
+      <div class="admin-panel">
+
+        <div class="muted">
+          DEVICE ENROLMENT
+        </div>
+
+        <h2>
+          Add Player To This Phone
+        </h2>
+
+        <p class="hint">
+          Generate a one-time code to add a player's existing secure login to another phone.
+          The code expires after 10 minutes.
+        </p>
+
+        <select
+          id="adminDevicePlayer"
+          class="admin-input"
+        >
+          <option value="">
+            Select player
+          </option>
+        </select>
+
+        <button
+          id="adminDeviceGenerate"
+          class="primary-btn"
+        >
+          GENERATE DEVICE CODE
+        </button>
+
+        <div
+          id="adminDeviceResult"
+          class="hint"
+          style="
+            margin-top:12px;
+            font-size:18px;
+            font-weight:800;
+            text-align:center;
+          "
+        >
+          No code generated.
+        </div>
+
+      </div>
       <!-- LOGOUT -->
 
       <button
@@ -1020,7 +1066,54 @@ function setupAdminControls() {
 
   }
 }
+  const devicePlayer =
+    document.getElementById(
+      "adminDevicePlayer"
+    );
 
+  const deviceGenerate =
+    document.getElementById(
+      "adminDeviceGenerate"
+    );
+
+  if (devicePlayer) {
+
+    devicePlayer.innerHTML =
+      '<option value="">Select player</option>' +
+      (window.lmsAdminPlayers || [])
+        .filter(function(player) {
+          return ![
+            "eliminated",
+            "removed"
+          ].includes(
+            String(
+              player.status || ""
+            ).toLowerCase()
+          );
+        })
+        .map(function(player) {
+          return (
+            '<option value="' +
+            escapeAdminHtml(player.id) +
+            '">' +
+            escapeAdminHtml(player.name) +
+            " (" +
+            escapeAdminHtml(player.player_code) +
+            ")</option>"
+          );
+        })
+        .join("");
+
+  }
+
+  if (deviceGenerate) {
+
+    deviceGenerate.addEventListener(
+      "click",
+      generateAdminDeviceCode
+    );
+
+  }
 
 /* =====================================================
    LOGIN
@@ -1904,7 +1997,139 @@ async function loadPlayers() {
   }
 
 }
+/* =====================================================
+   ADMIN DEVICE ENROLMENT
+   ===================================================== */
 
+async function generateAdminDeviceCode() {
+
+  const select =
+    document.getElementById(
+      "adminDevicePlayer"
+    );
+
+  const button =
+    document.getElementById(
+      "adminDeviceGenerate"
+    );
+
+  const result =
+    document.getElementById(
+      "adminDeviceResult"
+    );
+
+  const playerId =
+    select?.value || "";
+
+  if (!playerId) {
+
+    if (result) {
+      result.textContent =
+        "Select a player first.";
+    }
+
+    return;
+  }
+
+  const token =
+    sessionStorage.getItem(
+      "lms_admin_token"
+    );
+
+  if (!token) {
+
+    if (result) {
+      result.textContent =
+        "Admin session expired. Please log in again.";
+    }
+
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent =
+      "GENERATING...";
+  }
+
+  if (result) {
+    result.textContent =
+      "Generating code...";
+  }
+
+  try {
+
+    const raw =
+      await adminCallRpc(
+        "create_lms_device_enrolment",
+        {
+          p_session_token:
+            token,
+
+          p_player_id:
+            playerId
+        }
+      );
+
+    const data =
+      Array.isArray(raw)
+        ? raw[0]
+        : raw;
+
+    if (
+      !data ||
+      data.success === false
+    ) {
+      throw new Error(
+        data?.message ||
+        "Could not generate device code."
+      );
+    }
+
+    if (result) {
+
+      result.innerHTML =
+        "DEVICE CODE<br><br>" +
+        "<span style=\"font-size:30px;letter-spacing:4px;\">" +
+        escapeAdminHtml(
+          data.enrolment_code
+        ) +
+        "</span><br><br>" +
+        "<span style=\"font-size:13px;font-weight:400;\">" +
+        escapeAdminHtml(
+          data.player_name
+        ) +
+        " — expires in 10 minutes</span>";
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "DEVICE ENROLMENT ERROR:",
+      error
+    );
+
+    if (result) {
+      result.textContent =
+        "ERROR: " +
+        (
+          error?.message ||
+          "Could not generate device code."
+        );
+    }
+
+  } finally {
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "GENERATE DEVICE CODE";
+    }
+
+  }
+
+}
 /* =====================================================
    ADMIN ENTER PREDICTION
    ===================================================== */
