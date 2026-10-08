@@ -123,6 +123,8 @@
         style="
           width:100%;
           max-width:420px;
+          max-height:calc(100vh - 40px);
+          overflow-y:auto;
           background:white;
           border-radius:20px;
           padding:30px 24px;
@@ -222,6 +224,73 @@
           SET UP SECURE LOGIN
         </button>
 
+
+        <div
+          style="
+            margin:24px 0 14px;
+            color:#9ca3af;
+            font-size:13px;
+            font-weight:700;
+          "
+        >
+          ALREADY SECURED PLAYER
+        </div>
+
+        <div
+          style="
+            color:#6b7280;
+            font-size:13px;
+            line-height:1.45;
+            margin-bottom:10px;
+          "
+        >
+          To add this phone for a player who already has
+          secure login, enter the temporary device enrolment
+          code supplied by the organiser.
+        </div>
+
+        <input
+          id="lms-enrolment-code"
+          type="text"
+          inputmode="text"
+          autocomplete="off"
+          autocapitalize="characters"
+          maxlength="20"
+          placeholder="DEVICE CODE"
+          style="
+            width:100%;
+            box-sizing:border-box;
+            padding:16px;
+            font-size:20px;
+            font-weight:700;
+            text-align:center;
+            letter-spacing:2px;
+            border:2px solid #d1d5db;
+            border-radius:12px;
+            outline:none;
+            text-transform:uppercase;
+          "
+        />
+
+        <button
+          id="lms-enrolment-button"
+          style="
+            width:100%;
+            margin-top:12px;
+            padding:16px;
+            border:0;
+            border-radius:12px;
+            background:#2563eb;
+            color:white;
+            font-size:17px;
+            font-weight:800;
+            cursor:pointer;
+          "
+        >
+          ADD THIS PHONE
+        </button>
+
+
         <div
           id="lms-login-error"
           style="
@@ -263,6 +332,16 @@
 
     document
       .getElementById(
+        "lms-enrolment-button"
+      )
+      .addEventListener(
+        "click",
+        deviceEnrolmentSetup
+      );
+
+
+    document
+      .getElementById(
         "lms-login-code"
       )
       .addEventListener(
@@ -273,6 +352,24 @@
             event.key === "Enter"
           ) {
             firstTimeSetup();
+          }
+
+        }
+      );
+
+
+    document
+      .getElementById(
+        "lms-enrolment-code"
+      )
+      .addEventListener(
+        "keydown",
+        function (event) {
+
+          if (
+            event.key === "Enter"
+          ) {
+            deviceEnrolmentSetup();
           }
 
         }
@@ -321,8 +418,22 @@
 
 
   async function establishBridgeSession(
-    code
+    code,
+    enrolmentCode
   ) {
+
+    const body = {};
+
+    if (code) {
+      body.player_code =
+        code;
+    }
+
+    if (enrolmentCode) {
+      body.enrolment_code =
+        enrolmentCode;
+    }
+
 
     const response =
       await fetch(
@@ -339,9 +450,8 @@
               SUPABASE_KEY
           },
 
-          body: JSON.stringify({
-            player_code: code
-          })
+          body:
+            JSON.stringify(body)
         }
       );
 
@@ -475,7 +585,8 @@
     try {
 
       await establishBridgeSession(
-        code
+        code,
+        null
       );
 
 
@@ -555,7 +666,7 @@
       ) {
 
         setLoginMessage(
-          "This player is already secured. Use the Face ID / fingerprint button above.",
+          "This player is already secured. Use the Face ID / fingerprint button above, or use the device enrolment option below to add this phone.",
           true
         );
 
@@ -567,6 +678,157 @@
           true
         );
       }
+    }
+  }
+
+
+  async function deviceEnrolmentSetup() {
+
+    const input =
+      document.getElementById(
+        "lms-enrolment-code"
+      );
+
+    const button =
+      document.getElementById(
+        "lms-enrolment-button"
+      );
+
+
+    const enrolmentCode =
+      (
+        input?.value || ""
+      )
+        .trim()
+        .toUpperCase();
+
+
+    if (
+      enrolmentCode.length < 4
+    ) {
+
+      setLoginMessage(
+        "Please enter the device enrolment code.",
+        true
+      );
+
+      return;
+    }
+
+
+    button.disabled =
+      true;
+
+    button.textContent =
+      "VERIFYING...";
+
+
+    setLoginMessage(
+      "Checking the device enrolment code..."
+    );
+
+
+    try {
+
+      const bridge =
+        await establishBridgeSession(
+          null,
+          enrolmentCode
+        );
+
+
+      if (
+        !bridge ||
+        !bridge.player_code
+      ) {
+
+        throw new Error(
+          "The device enrolment did not return a player."
+        );
+      }
+
+
+      button.textContent =
+        "SETTING UP...";
+
+
+      setLoginMessage(
+        "Now create the secure Face ID / fingerprint login for this phone."
+      );
+
+
+      await registerPasskey();
+
+
+      /*
+       * The player is already enrolled, so this RPC is
+       * harmless and keeps the normal setup path intact.
+       */
+      const {
+        error
+      } =
+      await supabaseClient.rpc(
+        "mark_lms_passkey_enrolled"
+      );
+
+
+      if (error) {
+        throw error;
+      }
+
+
+      saveCode(
+        bridge.player_code
+      );
+
+
+      button.textContent =
+        "READY";
+
+
+      setLoginMessage(
+        "This phone has been added. Opening the player's game..."
+      );
+
+
+      hideLogin();
+
+
+      if (
+        window.lmsSwitchPlayer
+      ) {
+
+        await window.lmsSwitchPlayer(
+          bridge.player_code
+        );
+
+      } else {
+
+        window.location.reload();
+
+      }
+
+
+    } catch (err) {
+
+      console.error(
+        "LMS device enrolment error:",
+        err
+      );
+
+
+      button.disabled =
+        false;
+
+      button.textContent =
+        "ADD THIS PHONE";
+
+
+      setLoginMessage(
+        err?.message ||
+        "Device enrolment failed. Please check the code.",
+        true
+      );
     }
   }
 
@@ -629,16 +891,6 @@
         "Login successful. Opening your game..."
       );
 
-
-      /*
-       * IMPORTANT:
-       *
-       * Do NOT reload the page here.
-       *
-       * The authenticated Supabase session is
-       * already active. Tell the existing app
-       * to load this player immediately.
-       */
 
       hideLogin();
 
@@ -840,6 +1092,8 @@
         style="
           width:100%;
           max-width:420px;
+          max-height:calc(100vh - 40px);
+          overflow-y:auto;
           background:white;
           border-radius:20px;
           padding:24px;
@@ -981,6 +1235,7 @@
           LOG OUT
         </button>
 
+
         <button
           id="lms-switch-player"
           style="
@@ -996,6 +1251,8 @@
         >
           SWITCH PLAYER
         </button>
+
+
         <button
           id="lms-security-close"
           style="
@@ -1047,6 +1304,7 @@
         await window.lmsLogoutPlayer();
       };
 
+
     document
       .getElementById(
         "lms-switch-player"
@@ -1072,6 +1330,8 @@
           "Enter the next player's code, then use Face ID / fingerprint to sign them in."
         );
       };
+
+
     document
       .getElementById(
         "lms-verify-security"
@@ -1145,13 +1405,6 @@
           message.style.color =
             "#166534";
 
-
-          /*
-           * IMPORTANT:
-           * Do not reload the page.
-           * The authenticated session is already
-           * available to app.js.
-           */
 
           if (
             window.lmsSwitchPlayer
