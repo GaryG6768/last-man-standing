@@ -37,7 +37,6 @@
 
 
   function showLogin() {
-
     const overlay =
       document.getElementById(
         "lms-login-overlay"
@@ -50,7 +49,6 @@
 
 
   function hideLogin() {
-
     const overlay =
       document.getElementById(
         "lms-login-overlay"
@@ -66,7 +64,6 @@
     message,
     isError = false
   ) {
-
     const el =
       document.getElementById(
         "lms-login-error"
@@ -183,6 +180,19 @@
           FIRST-TIME SETUP
         </div>
 
+        <div
+          style="
+            color:#6b7280;
+            font-size:13px;
+            line-height:1.45;
+            margin-bottom:10px;
+          "
+        >
+          Enter your player code to set up secure login.
+          If this player is already secured, this phone
+          will be prepared automatically.
+        </div>
+
         <input
           id="lms-login-code"
           type="text"
@@ -223,73 +233,6 @@
         >
           SET UP SECURE LOGIN
         </button>
-
-
-        <div
-          style="
-            margin:24px 0 14px;
-            color:#9ca3af;
-            font-size:13px;
-            font-weight:700;
-          "
-        >
-          ALREADY SECURED PLAYER
-        </div>
-
-        <div
-          style="
-            color:#6b7280;
-            font-size:13px;
-            line-height:1.45;
-            margin-bottom:10px;
-          "
-        >
-          To add this phone for a player who already has
-          secure login, enter the temporary device enrolment
-          code supplied by the organiser.
-        </div>
-
-        <input
-          id="lms-enrolment-code"
-          type="text"
-          inputmode="text"
-          autocomplete="off"
-          autocapitalize="characters"
-          maxlength="20"
-          placeholder="DEVICE CODE"
-          style="
-            width:100%;
-            box-sizing:border-box;
-            padding:16px;
-            font-size:20px;
-            font-weight:700;
-            text-align:center;
-            letter-spacing:2px;
-            border:2px solid #d1d5db;
-            border-radius:12px;
-            outline:none;
-            text-transform:uppercase;
-          "
-        />
-
-        <button
-          id="lms-enrolment-button"
-          style="
-            width:100%;
-            margin-top:12px;
-            padding:16px;
-            border:0;
-            border-radius:12px;
-            background:#2563eb;
-            color:white;
-            font-size:17px;
-            font-weight:800;
-            cursor:pointer;
-          "
-        >
-          ADD THIS PHONE
-        </button>
-
 
         <div
           id="lms-login-error"
@@ -332,16 +275,6 @@
 
     document
       .getElementById(
-        "lms-enrolment-button"
-      )
-      .addEventListener(
-        "click",
-        deviceEnrolmentSetup
-      );
-
-
-    document
-      .getElementById(
         "lms-login-code"
       )
       .addEventListener(
@@ -352,24 +285,6 @@
             event.key === "Enter"
           ) {
             firstTimeSetup();
-          }
-
-        }
-      );
-
-
-    document
-      .getElementById(
-        "lms-enrolment-code"
-      )
-      .addEventListener(
-        "keydown",
-        function (event) {
-
-          if (
-            event.key === "Enter"
-          ) {
-            deviceEnrolmentSetup();
           }
 
         }
@@ -584,6 +499,19 @@
 
     try {
 
+      /*
+       * First try the normal player-code login.
+       *
+       * If this player is not yet secured, this
+       * continues normally.
+       *
+       * If this player is already secured,
+       * lms-auth-bridge returns PASSKEY_REQUIRED.
+       *
+       * IMPORTANT:
+       * The current player's authenticated Supabase
+       * session is still active at this point.
+       */
       await establishBridgeSession(
         code,
         null
@@ -592,7 +520,6 @@
 
       button.textContent =
         "SETTING UP...";
-
 
       setLoginMessage(
         "Now create your secure Face ID / fingerprint login."
@@ -647,6 +574,159 @@
 
     } catch (err) {
 
+      /*
+       * This is the important automatic phone setup
+       * path for a player who is already secured.
+       */
+      if (
+        err?.code ===
+        "PASSKEY_REQUIRED"
+      ) {
+
+        try {
+
+          button.textContent =
+            "PREPARING PHONE...";
+
+          setLoginMessage(
+            "Preparing this phone for the player..."
+          );
+
+
+          /*
+           * The current authenticated player's
+           * Supabase session is still active here.
+           *
+           * The RPC creates the temporary enrolment
+           * code internally. The player never sees it.
+           */
+          const result =
+            await callRpc(
+              "create_lms_self_device_enrolment",
+              {
+                p_player_code:
+                  code
+              }
+            );
+
+
+          if (
+            !result ||
+            result.success !== true ||
+            !result.enrolment_code
+          ) {
+
+            throw new Error(
+              result?.message ||
+              "This phone could not be prepared for this player."
+            );
+          }
+
+
+          setLoginMessage(
+            "Phone prepared. Creating secure Face ID / fingerprint login..."
+          );
+
+
+          /*
+           * Consume the temporary code immediately.
+           * It is never displayed to the player.
+           *
+           * This replaces the current Supabase session
+           * with the target player's authenticated session.
+           */
+          await establishBridgeSession(
+            null,
+            result.enrolment_code
+          );
+
+
+          button.textContent =
+            "SETTING UP...";
+
+
+          setLoginMessage(
+            "Now create the secure Face ID / fingerprint login for this player."
+          );
+
+
+          await registerPasskey();
+
+
+          const {
+            error
+          } =
+          await supabaseClient.rpc(
+            "mark_lms_passkey_enrolled"
+          );
+
+
+          if (error) {
+            throw error;
+          }
+
+
+          saveCode(
+            result.player_code ||
+            code
+          );
+
+
+          button.textContent =
+            "READY";
+
+
+          setLoginMessage(
+            "Secure login created. Opening the player's game..."
+          );
+
+
+          hideLogin();
+
+
+          if (
+            window.lmsSwitchPlayer
+          ) {
+
+            await window.lmsSwitchPlayer(
+              result.player_code ||
+              code
+            );
+
+          } else {
+
+            window.location.reload();
+
+          }
+
+
+        } catch (setupError) {
+
+          console.error(
+            "LMS automatic phone setup error:",
+            setupError
+          );
+
+
+          button.disabled =
+            false;
+
+          button.textContent =
+            "SET UP SECURE LOGIN";
+
+
+          setLoginMessage(
+            setupError?.message ||
+            "This phone could not be prepared for the player.",
+            true
+          );
+        }
+
+
+        return;
+      }
+
+
       console.error(
         "LMS secure setup error:",
         err
@@ -660,173 +740,9 @@
         "SET UP SECURE LOGIN";
 
 
-      if (
-        err?.code ===
-        "PASSKEY_REQUIRED"
-      ) {
-
-        setLoginMessage(
-          "This player is already secured. Use the Face ID / fingerprint button above, or use the device enrolment option below to add this phone.",
-          true
-        );
-
-      } else {
-
-        setLoginMessage(
-          err?.message ||
-          "Secure login setup failed.",
-          true
-        );
-      }
-    }
-  }
-
-
-  async function deviceEnrolmentSetup() {
-
-    const input =
-      document.getElementById(
-        "lms-enrolment-code"
-      );
-
-    const button =
-      document.getElementById(
-        "lms-enrolment-button"
-      );
-
-
-    const enrolmentCode =
-      (
-        input?.value || ""
-      )
-        .trim()
-        .toUpperCase();
-
-
-    if (
-      enrolmentCode.length < 4
-    ) {
-
-      setLoginMessage(
-        "Please enter the device enrolment code.",
-        true
-      );
-
-      return;
-    }
-
-
-    button.disabled =
-      true;
-
-    button.textContent =
-      "VERIFYING...";
-
-
-    setLoginMessage(
-      "Checking the device enrolment code..."
-    );
-
-
-    try {
-
-      const bridge =
-        await establishBridgeSession(
-          null,
-          enrolmentCode
-        );
-
-
-      if (
-        !bridge ||
-        !bridge.player_code
-      ) {
-
-        throw new Error(
-          "The device enrolment did not return a player."
-        );
-      }
-
-
-      button.textContent =
-        "SETTING UP...";
-
-
-      setLoginMessage(
-        "Now create the secure Face ID / fingerprint login for this phone."
-      );
-
-
-      await registerPasskey();
-
-
-      /*
-       * The player is already enrolled, so this RPC is
-       * harmless and keeps the normal setup path intact.
-       */
-      const {
-        error
-      } =
-      await supabaseClient.rpc(
-        "mark_lms_passkey_enrolled"
-      );
-
-
-      if (error) {
-        throw error;
-      }
-
-
-      saveCode(
-        bridge.player_code
-      );
-
-
-      button.textContent =
-        "READY";
-
-
-      setLoginMessage(
-        "This phone has been added. Opening the player's game..."
-      );
-
-
-      hideLogin();
-
-
-      if (
-        window.lmsSwitchPlayer
-      ) {
-
-        await window.lmsSwitchPlayer(
-          bridge.player_code
-        );
-
-      } else {
-
-        window.location.reload();
-
-      }
-
-
-    } catch (err) {
-
-      console.error(
-        "LMS device enrolment error:",
-        err
-      );
-
-
-      button.disabled =
-        false;
-
-      button.textContent =
-        "ADD THIS PHONE";
-
-
       setLoginMessage(
         err?.message ||
-        "Device enrolment failed. Please check the code.",
+        "Secure login setup failed.",
         true
       );
     }
@@ -1314,20 +1230,23 @@
 
         overlay.remove();
 
+        /*
+         * IMPORTANT:
+         *
+         * DO NOT sign out here.
+         *
+         * The current authenticated player's
+         * Supabase session is required so the
+         * automatic device enrolment RPC can
+         * prepare the next player's phone.
+         */
+
         clearCode();
-
-        if (supabaseClient) {
-
-          await supabaseClient.auth
-            .signOut({
-              scope: "local"
-            });
-        }
 
         showLogin();
 
         setLoginMessage(
-          "Enter the next player's code, then use Face ID / fingerprint to sign them in."
+          "Enter the next player's code to set up this phone."
         );
       };
 
@@ -1443,7 +1362,6 @@
           message.textContent =
             err?.message ||
             "Verification failed.";
-
 
           message.style.color =
             "#dc2626";
@@ -1584,7 +1502,6 @@
           message.textContent =
             err?.message ||
             "Code could not be changed.";
-
 
           message.style.color =
             "#dc2626";
