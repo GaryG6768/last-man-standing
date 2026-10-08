@@ -1081,7 +1081,6 @@ function setupAdminControls() {
   }
 
 }
-
 /* =====================================================
    LOGIN
    ===================================================== */
@@ -1923,11 +1922,11 @@ async function loadPlayers() {
     window.lmsAdminPlayers =
       players;
 
-    populateAdminDevicePlayers(
+    populateAdminPredictionPlayers(
       players
     );
 
-    populateAdminPredictionPlayers(
+    populateAdminDevicePlayers(
       players
     );
 
@@ -1971,6 +1970,53 @@ async function loadPlayers() {
 /* =====================================================
    ADMIN DEVICE ENROLMENT
    ===================================================== */
+
+function populateAdminDevicePlayers(players) {
+
+  const select =
+    document.getElementById(
+      "adminDevicePlayer"
+    );
+
+  if (!select) {
+    return;
+  }
+
+  const current =
+    select.value;
+
+  select.innerHTML =
+    '<option value="">Select player</option>' +
+    (players || [])
+      .filter(function(player) {
+        return ![
+          "eliminated",
+          "removed"
+        ].includes(
+          String(
+            player.status || ""
+          ).toLowerCase()
+        );
+      })
+      .map(function(player) {
+        return (
+          '<option value="' +
+          escapeAdminHtml(player.id) +
+          '">' +
+          escapeAdminHtml(player.name) +
+          " (" +
+          escapeAdminHtml(player.player_code) +
+          ")</option>"
+        );
+      })
+      .join("");
+
+  if (current) {
+    select.value = current;
+  }
+
+}
+
 
 async function generateAdminDeviceCode() {
 
@@ -2101,51 +2147,6 @@ async function generateAdminDeviceCode() {
   }
 
 }
-function populateAdminDevicePlayers(players) {
-
-  const select =
-    document.getElementById(
-      "adminDevicePlayer"
-    );
-
-  if (!select) return;
-
-  const current =
-    select.value;
-
-  select.innerHTML =
-    '<option value="">Select player</option>' +
-    (players || [])
-      .filter(function(player) {
-        return ![
-          "eliminated",
-          "removed"
-        ].includes(
-          String(
-            player.status || ""
-          ).toLowerCase()
-        );
-      })
-      .map(function(player) {
-        return (
-          '<option value="' +
-          escapeAdminHtml(player.id) +
-          '">' +
-          escapeAdminHtml(player.name) +
-          " (" +
-          escapeAdminHtml(player.player_code) +
-          ")</option>"
-        );
-      })
-      .join("");
-
-  if (current) {
-    select.value = current;
-  }
-
-}
-
-
 /* =====================================================
    ADMIN ENTER PREDICTION
    ===================================================== */
